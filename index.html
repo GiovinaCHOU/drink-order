@@ -713,8 +713,9 @@ function renderMilkAdmin(){
     // 叫貨截止提醒 calendar URL (orange)
     const dlStart=`${deadline.getFullYear()}${pad(deadline.getMonth()+1)}${pad(deadline.getDate())}T${pad(deadline.getHours())}0000`;
     const dlEnd=`${deadline.getFullYear()}${pad(deadline.getMonth()+1)}${pad(deadline.getDate())}T${pad(deadline.getHours()+1)}0000`;
-    const dlDetails=totalQty>0?milkOrdersForDay.map(({o,qty})=>`${o.profile.name}：${qty}瓶`).join('\n')+'\\n建議叫 '+(totalQty+1)+'瓶':'';
-    const reminderUrl=gcalUrl(`📦 叫貨截止｜${dLabel}牛奶 ${totalQty}瓶`,dlStart,dlEnd,dlDetails,6);// 6=Tangerine orange
+    const orderQty=totalQty>0?totalQty+1:0;
+    const dlDetails=`到貨日期：${label}\n$68/罐 × ${orderQty}罐 ＝ $${68*orderQty}`;
+    const reminderUrl=gcalUrl(`開元叫貨 牛奶×${orderQty}罐`,dlStart,dlEnd,dlDetails,6);// 6=Tangerine orange
     html+=`<div class="delivery-card">
 <h3>${label}到貨 ${isOrdered?'<span class="milk-ordered-badge">✅ 已叫貨</span>':''}<span style="font-size:12px;color:${isPast?'var(--red)':'var(--dim)'}">${isPast?'❌已截單':`截止 ${deadline.getMonth()+1}/${deadline.getDate()} ${pad(deadline.getHours())}:00`}</span></h3>
 <div class="delivery-count">${totalQty} 瓶</div>
