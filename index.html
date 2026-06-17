@@ -468,7 +468,7 @@ const MENU=[
   {id:'bottled',label:'🍼 罐裝牛奶',special:'milk',items:[{id:'milk1',name:'罐裝牛奶',price:0,temp:'cold'}]},
   {id:'icecream',label:'🍦 冰棒',special:'icecream',items:ICE_IDS.map(id=>({id,name:ICE_NAMES[id]+'冰棒',price:0,temp:'cold'}))},
 ];
-let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'15:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:''},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
+let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'15:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:'',milkPickedUp:{}},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
 let db=null,_unsubOrders=null,_unsubStock=null,curFilter='all',activeTab='coffee',_fixedMonth=null;
 
 async function init(){
@@ -775,7 +775,8 @@ async function updateOrderStatus(orderId,newStatus){
         setTimeout(()=>{if(confirm('前往行事曆刪除相關事件？'))window.open(link,'_blank');},400);
       }else showToast('訂單已取消，庫存已更新');
     }else if(newStatus==='pending'){if(o&&(o.status||'')==='cancelled')updateSlotCount(o,1).catch(()=>{});showToast('已復原為待處理');}
-    else showToast(newStatus==='done'?'✅ 已完成':'🛍 已取貨');
+    else if(newStatus==='done'){showToast('✅ 已完成');}
+    else if(newStatus==='picked_up'){showToast('🛍 已取貨');setTimeout(()=>{if(confirm('要刪除此筆訂單紀錄嗎？'))deleteOrder(orderId);},400);}
   }catch(e){showToast('❌ 更新失敗：'+e.message);}
 }
 function confirmDeleteOrder(orderId){
@@ -827,7 +828,8 @@ ${isSkipped?`<div style="font-size:13px;color:var(--red);margin-bottom:10px">此
   緩衝瓶數：<input type="number" min="0" max="20" value="${buffer}" style="width:56px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:13px;text-align:center" onchange="setMilkBuffer('${dateISO}',+this.value)" oninput="this.value=Math.max(0,Math.min(20,+this.value||0))"> 瓶
   <span style="color:var(--dim)">→ 叫貨總數 <strong style="color:var(--gold)">${orderQty}</strong> 瓶</span>
 </div>
-${totalQty>0?milkOrdersForDay.map(({o,qty})=>`<div class="milk-order-row">${o.profile.name}（${o.profile.dept}）：${qty} 瓶</div>`).join(''):'<div style="font-size:12px;color:var(--dim)">目前無訂單</div>'}
+${totalQty>0?milkOrdersForDay.map(({o,qty})=>{const picked=!!((S.settings.milkPickedUp||{})[`${dateISO}_${o.id}`]);return isOrdered?`<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)"><input type="checkbox" ${picked?'checked':''} onchange="toggleMilkPickup('${dateISO}','${o.id}')" style="width:18px;height:18px;cursor:pointer;accent-color:#5dd87a;flex-shrink:0"><span style="${picked?'text-decoration:line-through;color:var(--dim)':''}">${o.profile.name}（${o.profile.dept}）${qty}瓶</span></div>`:`<div class="milk-order-row">${o.profile.name}（${o.profile.dept}）：${qty} 瓶</div>`;}).join(''):'<div style="font-size:12px;color:var(--dim)">目前無訂單</div>'}
+${isOrdered&&totalQty>0?`<div style="font-size:11px;color:var(--dim);margin-top:4px">勾選確認已來取貨</div>`:''}
 ${orderQty>0?`<div style="font-size:14px;color:var(--gold);margin:10px 0 4px;font-weight:700">💰 $68 × ${orderQty}瓶 = $${68*orderQty}</div>`:''}`}
 <div class="milk-action-row" style="margin-top:8px">
   ${isSkipped?'':`<button onclick="toggleMilkOrdered('${dateISO}')" style="flex:1;padding:8px;border-radius:8px;border:1px solid ${isOrdered?'rgba(58,170,80,.5)':'var(--border)'};background:${isOrdered?'rgba(58,170,80,.15)':'var(--surf2)'};color:${isOrdered?'#5dd87a':'var(--text)'};font-size:13px;cursor:pointer">${isOrdered?'✅ 已叫貨（點擊取消）':'📦 標記已叫貨'}</button>
@@ -845,6 +847,7 @@ async function toggleMilkOrdered(dateISO){
   renderMilkAdmin();
   showToast(S.settings.milkOrdered[dateISO]?'✅ 已標記叫貨':'已取消叫貨標記');
 }
+async function toggleMilkPickup(dateISO,orderId){const key=`${dateISO}_${orderId}`;const cur=S.settings.milkPickedUp||{};if(cur[key])delete cur[key];else cur[key]=true;S.settings.milkPickedUp={...cur};try{await db.collection('settings').doc('admin').set({milkPickedUp:S.settings.milkPickedUp},{merge:true});renderMilkAdmin();}catch(e){showToast('❌ 更新失敗');}}
 async function toggleMilkPaid(dateISO){
   const cur=S.settings.milkPaid||{};
   if(cur[dateISO])delete cur[dateISO];else cur[dateISO]=true;
