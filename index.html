@@ -50,7 +50,7 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
 .dt-disp{flex:1;text-align:center;font-size:18px;font-weight:600;background:var(--surf2);border-radius:8px;padding:8px 12px;cursor:pointer;border:1px solid var(--border);transition:.15s}
 .dt-disp:active{background:var(--border)}
 .dt-hint{font-size:11px;color:var(--dim);padding:6px 14px 10px;text-align:center}
-.notice-card{margin:8px 12px 0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.notice-card{margin:8px 12px 0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word;text-align:center}
 .notice-card.holiday{background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.3)}
 .notice-card.general{background:rgba(68,136,238,.08);border:1px solid rgba(68,136,238,.25)}
 .divider{height:1px;background:var(--border);margin:0 12px}
@@ -462,7 +462,7 @@ const MENU=[
   {id:'bottled',label:'🍼 罐裝牛奶',special:'milk',items:[{id:'milk1',name:'罐裝牛奶',price:0,temp:'cold'}]},
   {id:'icecream',label:'🍦 冰棒',special:'icecream',items:ICE_IDS.map(id=>({id,name:ICE_NAMES[id]+'冰棒',price:0,temp:'cold'}))},
 ];
-let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'17:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:''},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
+let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'15:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:''},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
 let db=null,_unsubOrders=null,_unsubStock=null,curFilter='all',activeTab='coffee',_fixedMonth=null;
 
 async function init(){
@@ -724,7 +724,7 @@ function renderOrderList(filter){
     const statusBadge=st==='done'?'<span class="oc-status done">✅ 已完成</span>'
       :st==='picked_up'?'<span class="oc-status picked">🛍 已取貨</span>'
       :st==='cancelled'?'<span class="oc-status cancelled">✕ 已取消</span>':'';
-    const itml=(o.items||[]).map(i=>{let p=i.payment==='cash'?'七折':i.payment==='v1'?'🎫×1':i.payment==='v4'?'🎫×4':i.payment==='v1p5'?'🎫×1+5':'🎫×2';let ml=i.milkDateLabel?` (${i.milkDateLabel})`:'';return`<div class="oc-item-row">· ${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}（${p}）${ml}</div>`;}).join('');
+    const itml=(o.items||[]).map(i=>{let p=i.payment==='cash'?'七折':i.payment==='v1'?`🎫×${i.qty}`:i.payment==='v4'?`🎫×${4*i.qty}`:i.payment==='v1p5'?`🎫×${i.qty}+${5*i.qty}`:`🎫×${2*i.qty}`;let ml=i.milkDateLabel?` (${i.milkDateLabel})`:'';return`<div class="oc-item-row">· ${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}（${p}）${ml}</div>`;}).join('');
     const calDayLink=(!o.isMilk&&o.dateISO)?`https://calendar.google.com/calendar/r/day/${o.dateISO.split('-').join('/')}`:null;
     const cancelExtra=isCancelled&&calDayLink?`<a href="${calDayLink}" target="_blank" rel="noopener" style="font-size:11px;color:#88bbff;margin-left:8px">📅 行事曆刪除</a>`:'';
     return`<div class="order-card${isCancelled?' is-cancelled':''}">
