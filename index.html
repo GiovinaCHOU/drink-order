@@ -719,7 +719,7 @@ function renderOrderList(filter){
   const orders=S._allOrders;const todayStr=new Date().toLocaleDateString('zh-TW');
   let list=orders;
   if(filter==='today')list=orders.filter(o=>o.date===todayStr);
-  if(filter==='upcoming')list=orders.filter(o=>new Date((o.dateISO||'')+'T00:00:00')>=new Date(new Date().setHours(0,0,0,0)));
+  if(filter==='upcoming')list=orders.filter(o=>new Date((o.dateISO||'')+'T00:00:00')>=new Date(new Date().setHours(0,0,0,0))&&!['done','picked_up','cancelled'].includes(o.status||'pending'));
   if(filter==='milk')list=orders.filter(o=>o.items?.some(i=>i.special==='milk'));
   const el=document.getElementById('order-list');if(!el)return;
   if(!list.length){el.innerHTML='<div class="empty-state">📭 沒有訂單</div>';return;}
