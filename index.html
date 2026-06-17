@@ -516,7 +516,7 @@ function nextValidDate(){const now=new Date();for(let i=0;i<=15;i++){const d=new
 function allSlots(){const r=[];for(let h=9;h<=12;h++)for(let m=0;m<60;m+=5)if(isValidSlot(h,m))r.push({h,m});for(let h=13;h<=16;h++)for(let m=0;m<60;m+=5)if(isValidSlot(h,m))r.push({h,m});return r;}
 function pad(n){return String(n).padStart(2,'0');}
 function updateDTDisplay(){const d=S.selDate;document.getElementById('disp-date').textContent=d?`${d.getMonth()+1}月${d.getDate()}日 (週${DAYS_ZH[d.getDay()]})`:'選擇日期';document.getElementById('disp-time').textContent=S.selTime?`${pad(S.selTime.h)}:${pad(S.selTime.m)}`:'選擇時間';}
-function renderNotices(){const hn=document.getElementById('holiday-notice'),on=document.getElementById('order-notice');const h=(S.settings.holidayNote||'').trim(),o=(S.settings.orderNote||'').trim();hn.textContent=h;hn.style.display=h?'':'none';on.textContent=o;on.style.display=o?'':'none';}
+function renderNotices(){const hn=document.getElementById('holiday-notice'),on=document.getElementById('order-notice');const h=(S.settings.holidayNote||'').trim(),o=(S.settings.orderNote||'').trim();const todayISO=dateToISO(new Date());const isTodayClosed=(S.settings.closedDates||[]).includes(todayISO);hn.textContent=h;hn.style.display=(h&&isTodayClosed)?'':'none';on.textContent=o;on.style.display=o?'':'none';}
 
 // ── Wheel engine ──
 const IH=48,wS={};
