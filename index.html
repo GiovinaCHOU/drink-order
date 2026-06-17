@@ -50,6 +50,9 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
 .dt-disp{flex:1;text-align:center;font-size:18px;font-weight:600;background:var(--surf2);border-radius:8px;padding:8px 12px;cursor:pointer;border:1px solid var(--border);transition:.15s}
 .dt-disp:active{background:var(--border)}
 .dt-hint{font-size:11px;color:var(--dim);padding:6px 14px 10px;text-align:center}
+.notice-card{margin:8px 12px 0;border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.notice-card.holiday{background:rgba(255,165,0,.08);border:1px solid rgba(255,165,0,.3)}
+.notice-card.general{background:rgba(68,136,238,.08);border:1px solid rgba(68,136,238,.25)}
 .divider{height:1px;background:var(--border);margin:0 12px}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:flex-end;justify-content:center}
 .modal-overlay.open{display:flex}
@@ -277,6 +280,8 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
       <div class="dt-row"><span class="lbl">🕐</span><div class="dt-disp" id="disp-time" onclick="openWheel('time')">選擇時間</div></div>
       <div class="dt-hint">時段：09:15–12:15 及 13:15–16:45，需提前15分鐘預訂</div>
     </div>
+    <div class="notice-card holiday" id="holiday-notice" style="display:none"></div>
+    <div class="notice-card general" id="order-notice" style="display:none"></div>
     <div class="section-label">點餐</div>
     <div class="tab-bar" id="tab-bar"></div>
     <div id="menu-panels"></div>
@@ -392,6 +397,18 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
       </div>
 
       <div class="srow" style="flex-direction:column;align-items:stretch">
+        <div class="sr-label">🚫 公休日公告</div>
+        <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 8px">顯示於日期選擇下方，留空則自動省略</div>
+        <textarea id="holiday-note" rows="3" placeholder="例如：本週五休息，下週正常營業" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit"></textarea>
+      </div>
+
+      <div class="srow" style="flex-direction:column;align-items:stretch">
+        <div class="sr-label">📢 自定義公告</div>
+        <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 8px">顯示於日期選擇下方，留空則自動省略</div>
+        <textarea id="order-note" rows="3" placeholder="例如：本週飲品特別優惠，請把握機會！" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit"></textarea>
+      </div>
+
+      <div class="srow" style="flex-direction:column;align-items:stretch">
         <div class="sr-label">通知設定（ntfy.sh）</div>
         <div class="ntfy-info" style="margin-top:8px">📱 手機下載 ntfy App → 訂閱 Topic → 即收推播<br><a href="https://ntfy.sh" target="_blank" style="color:#88bbff">ntfy.sh</a> 完全免費</div>
         <label style="font-size:13px;color:var(--dim);margin-bottom:4px">ntfy Topic 名稱</label>
@@ -445,7 +462,7 @@ const MENU=[
   {id:'bottled',label:'🍼 罐裝牛奶',special:'milk',items:[{id:'milk1',name:'罐裝牛奶',price:0,temp:'cold'}]},
   {id:'icecream',label:'🍦 冰棒',special:'icecream',items:ICE_IDS.map(id=>({id,name:ICE_NAMES[id]+'冰棒',price:0,temp:'cold'}))},
 ];
-let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'17:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[]},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
+let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'17:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:''},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
 let db=null,_unsubOrders=null,_unsubStock=null,curFilter='all',activeTab='coffee',_fixedMonth=null;
 
 async function init(){
@@ -459,7 +476,7 @@ async function init(){
     const p=localStorage.getItem('drinkProfile');
     if(p){S.profile=JSON.parse(p);renderProfileChip();showView('v-order');}else showView('v-profile');
     const nv=nextValidDate();if(nv){S.selDate=nv.date;S.selTime=nv.slot;}
-    updateDTDisplay();buildMenu();renderCart();
+    updateDTDisplay();buildMenu();renderCart();renderNotices();
     startTimeWatcher();
   }catch(e){console.error(e);showToast('⚠️ 資料庫連線失敗，請檢查網路');showView('v-profile');}
 }
@@ -499,6 +516,7 @@ function nextValidDate(){const now=new Date();for(let i=0;i<=15;i++){const d=new
 function allSlots(){const r=[];for(let h=9;h<=12;h++)for(let m=0;m<60;m+=5)if(isValidSlot(h,m))r.push({h,m});for(let h=13;h<=16;h++)for(let m=0;m<60;m+=5)if(isValidSlot(h,m))r.push({h,m});return r;}
 function pad(n){return String(n).padStart(2,'0');}
 function updateDTDisplay(){const d=S.selDate;document.getElementById('disp-date').textContent=d?`${d.getMonth()+1}月${d.getDate()}日 (週${DAYS_ZH[d.getDay()]})`:'選擇日期';document.getElementById('disp-time').textContent=S.selTime?`${pad(S.selTime.h)}:${pad(S.selTime.m)}`:'選擇時間';}
+function renderNotices(){const hn=document.getElementById('holiday-notice'),on=document.getElementById('order-notice');const h=(S.settings.holidayNote||'').trim(),o=(S.settings.orderNote||'').trim();hn.textContent=h;hn.style.display=h?'':'none';on.textContent=o;on.style.display=o?'':'none';}
 
 // ── Wheel engine ──
 const IH=48,wS={};
@@ -688,7 +706,7 @@ function openAdmin(){document.getElementById('pin-overlay').style.display='flex'
 function leaveAdmin(){if(_unsubOrders){_unsubOrders();_unsubOrders=null;}showView('v-order');}
 function checkPin(){const e=document.getElementById('pin-input').value;if(e===S.settings.pin){document.getElementById('pin-overlay').style.display='none';loadAdminUI();subscribeOrders();}else{document.getElementById('pin-error').textContent='PIN 碼錯誤';document.getElementById('pin-input').value='';}}
 document.getElementById('pin-input').addEventListener('keydown',e=>{if(e.key==='Enter')checkPin();});
-function loadAdminUI(){document.getElementById('ntfy-topic').value=S.settings.ntfyTopic||'';document.getElementById('bear-url').value=S.settings.bearUrl||'';document.getElementById('success-image-url').value=S.settings.successImageUrl||'';document.getElementById('success-note').value=S.settings.successNote||'';renderClosedDatesCalendar();}
+function loadAdminUI(){document.getElementById('ntfy-topic').value=S.settings.ntfyTopic||'';document.getElementById('bear-url').value=S.settings.bearUrl||'';document.getElementById('success-image-url').value=S.settings.successImageUrl||'';document.getElementById('success-note').value=S.settings.successNote||'';document.getElementById('holiday-note').value=S.settings.holidayNote||'';document.getElementById('order-note').value=S.settings.orderNote||'';renderClosedDatesCalendar();}
 function switchAdminTab(tab){document.querySelectorAll('.atab').forEach((t,i)=>t.classList.toggle('active',['orders','milk','stock','settings'][i]===tab));document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+tab).classList.add('active');if(tab==='stock')renderStockPanel();if(tab==='milk')renderMilkAdmin();}
 function filterOrders(chip){document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));chip.classList.add('active');curFilter=chip.dataset.f;renderOrderList(curFilter);}
 function renderOrderList(filter){
@@ -884,7 +902,7 @@ function toggleClosedDate(iso){const dates=S.settings.closedDates||[];S.settings
 function prevCalMonth(){_calM--;if(_calM<0){_calM=11;_calY--;}renderClosedDatesCalendar();}
 function nextCalMonth(){_calM++;if(_calM>11){_calM=0;_calY++;}renderClosedDatesCalendar();}
 
-async function saveSettings(){const np=document.getElementById('new-pin').value,np2=document.getElementById('new-pin2').value;if(np){if(np!==np2){showToast('兩次 PIN 碼不一致');return;}if(!/^\d{4,8}$/.test(np)){showToast('PIN 碼需為4-8位數字');return;}S.settings.pin=np;localStorage.setItem('adminPin',np);document.getElementById('new-pin').value='';document.getElementById('new-pin2').value='';}const cfg={ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),successImageUrl:document.getElementById('success-image-url').value.trim(),successNote:document.getElementById('success-note').value,closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
+async function saveSettings(){const np=document.getElementById('new-pin').value,np2=document.getElementById('new-pin2').value;if(np){if(np!==np2){showToast('兩次 PIN 碼不一致');return;}if(!/^\d{4,8}$/.test(np)){showToast('PIN 碼需為4-8位數字');return;}S.settings.pin=np;localStorage.setItem('adminPin',np);document.getElementById('new-pin').value='';document.getElementById('new-pin2').value='';}const cfg={ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),successImageUrl:document.getElementById('success-image-url').value.trim(),successNote:document.getElementById('success-note').value,holidayNote:document.getElementById('holiday-note').value,orderNote:document.getElementById('order-note').value,closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};renderNotices();try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
 async function clearAllOrders(){if(!confirm('確定要清除所有訂單？此操作無法復原。'))return;const snap=await db.collection('orders').get();const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));await batch.commit();showToast('已清除');}
 async function testNtfy(){const topic=document.getElementById('ntfy-topic').value.trim();const res=document.getElementById('ntfy-test-result');if(!topic){res.style.color='var(--red)';res.textContent='請先填入 Topic 名稱';return;}res.style.color='var(--dim)';res.textContent='傳送中...';try{const r=await fetch(`https://ntfy.sh/${topic}`,{method:'POST',body:'Test - drink order system connected'});if(r.ok){res.style.color='var(--green)';res.textContent='✅ 已送出，請確認手機是否收到';}else{res.style.color='var(--red)';res.textContent=`❌ 失敗（${r.status}）`;}}catch(e){res.style.color='var(--red)';res.textContent='❌ 網路錯誤：'+e.message;}}
 
