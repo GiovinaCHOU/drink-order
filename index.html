@@ -334,7 +334,7 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
 
 <div class="view" id="v-success">
   <div class="success-body">
-    <span class="success-icon">✅</span>
+    <span class="success-icon" id="success-icon">✅</span>
     <div class="success-title">預訂成功！</div>
     <div class="success-sub">您的訂單已送出</div>
     <div id="success-summary" class="osb"></div>
@@ -413,6 +413,18 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
         <input type="text" id="bear-url" placeholder="https://... 圖片連結">
       </div>
 
+      <div class="srow" style="flex-direction:column;align-items:stretch">
+        <div class="sr-label">預訂成功圖片 URL</div>
+        <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 8px">預訂成功畫面顯示的圖示，留空則顯示 ✅</div>
+        <input type="text" id="success-image-url" placeholder="https://... 圖片連結">
+      </div>
+
+      <div class="srow" style="flex-direction:column;align-items:stretch">
+        <div class="sr-label">預訂成功備註</div>
+        <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 8px">預訂成功畫面底部的說明文字（支援換行）</div>
+        <textarea id="success-note" rows="4" placeholder="留空則顯示預設文字" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit"></textarea>
+      </div>
+
       <button class="asave-btn" onclick="saveSettings()">儲存設定</button>
       <button style="width:100%;padding:12px;background:rgba(224,53,53,.1);border:1px solid rgba(224,53,53,.3);border-radius:10px;font-size:14px;color:var(--red);cursor:pointer;margin-top:8px" onclick="clearAllOrders()">清除所有訂單紀錄</button>
     </div>
@@ -433,7 +445,7 @@ const MENU=[
   {id:'bottled',label:'🍼 罐裝牛奶',special:'milk',items:[{id:'milk1',name:'罐裝牛奶',price:0,temp:'cold'}]},
   {id:'icecream',label:'🍦 冰棒',special:'icecream',items:ICE_IDS.map(id=>({id,name:ICE_NAMES[id]+'冰棒',price:0,temp:'cold'}))},
 ];
-let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',milkLocation:'',milkPickupTime:'17:00',milkOrdered:{},closedDates:[]},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
+let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'17:00',milkOrdered:{},milkPaid:{},closedDates:[]},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
 let db=null,_unsubOrders=null,_unsubStock=null,curFilter='all',activeTab='coffee',_fixedMonth=null;
 
 async function init(){
@@ -456,7 +468,7 @@ async function loadSettingsFromDB(){const s=await db.collection('settings').doc(
 function subscribeStock(){if(_unsubStock)_unsubStock();_unsubStock=db.collection('settings').doc('icestock').onSnapshot(s=>{if(s.exists){S.iceStock={...ICE_DEFAULT,...s.data()};buildMenu();}});}
 function subscribeOrders(){if(_unsubOrders)_unsubOrders();_unsubOrders=db.collection('orders').orderBy('createdAt','desc').limit(300).onSnapshot(s=>{S._allOrders=s.docs.map(d=>d.data());renderOrderList(curFilter);});}
 let _unsubSlots=null;
-function subscribeSlotCounts(){if(_unsubSlots)_unsubSlots();_unsubSlots=db.collection('settings').doc('slotCounts').onSnapshot(s=>{S.slotCounts=s.exists?s.data():{};if(S.selDate&&S.selTime)checkTimeValidity();});}
+function subscribeSlotCounts(){if(_unsubSlots)_unsubSlots();_unsubSlots=db.collection('settings').doc('slotCounts').onSnapshot(s=>{S.slotCounts=s.exists?s.data():{};if(S.selDate&&S.selTime&&document.getElementById('v-order').classList.contains('active'))checkTimeValidity();},e=>{console.warn('slotCounts subscription error:',e);});}
 
 // ── Time watcher: auto-jump if current slot expires ──
 function startTimeWatcher(){setInterval(checkTimeValidity,30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkTimeValidity();});}
@@ -479,8 +491,9 @@ function showView(id){document.querySelectorAll('.view').forEach(v=>v.classList.
 function dateToISO(d){return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 function isDateClosed(dateObj){if(!dateObj)return false;return(S.settings.closedDates||[]).includes(dateToISO(dateObj));}
 function isValidSlot(h,m){const t=h*60+m;return(t>=9*60+15&&t<=12*60+15)||(t>=13*60+15&&t<=16*60+45);}
-function slotMinLead(dateObj,h,m){const key=`${dateToISO(dateObj)}_${pad(h)}:${pad(m)}`;const cups=(S.slotCounts||{})[key]||0;return Math.max(15*60*1000,cups*3*60*1000);}
-function isBlocked(h,m,dateObj){if(!isValidSlot(h,m))return true;const now=new Date();const sel=new Date(dateObj);sel.setHours(h,m,0,0);return sel-now<slotMinLead(dateObj,h,m);}
+// Returns true if existing orders already exceed slot capacity (3 min/cup from 9:00 opening)
+function slotCapacityFull(dateObj,h,m,extraCups){const key=`${dateToISO(dateObj)}_${pad(h)}:${pad(m)}`;const cups=((S.slotCounts||{})[key]||0)+(extraCups||0);if(!cups)return false;const availMin=(h*60+m)-9*60;if(availMin<=0)return false;return cups*3>availMin;}
+function isBlocked(h,m,dateObj){if(!isValidSlot(h,m))return true;if(slotCapacityFull(dateObj,h,m,0))return true;const now=new Date();const sel=new Date(dateObj);sel.setHours(h,m,0,0);return sel-now<15*60*1000;}
 function nextValidSlot(dateObj){for(const{h,m}of allSlots()){if(!isBlocked(h,m,dateObj))return{h,m};}return null;}
 function nextValidDate(){const now=new Date();for(let i=0;i<=15;i++){const d=new Date(now);d.setDate(now.getDate()+i);d.setHours(0,0,0,0);if(d.getDay()===0)continue;if(isDateClosed(d))continue;const slot=nextValidSlot(d);if(slot)return{date:d,slot};}return null;}
 function allSlots(){const r=[];for(let h=9;h<=12;h++)for(let m=0;m<60;m+=5)if(isValidSlot(h,m))r.push({h,m});for(let h=13;h<=16;h++)for(let m=0;m<60;m+=5)if(isValidSlot(h,m))r.push({h,m});return r;}
@@ -561,13 +574,31 @@ function pickMilkDate(i){if(!S._milkDeliveries[i])return;S.selMilkDate=S._milkDe
 
 // ── Review ──
 function goReview(){const items=cartItems();if(!items.length){showToast('請先加入品項');return;}if(!S.profile){showToast('請先填寫個人資料');showView('v-profile');return;}const hasDrinkItems=items.some(i=>!i.special);if(hasDrinkItems&&(!S.selDate||!S.selTime)){showToast('請先選擇飲品取餐時間');return;}if(items.some(i=>i.special!=='milk')&&S.selDate&&isDateClosed(S.selDate)){showToast('該日為公休日，不開放飲品及冰棒訂購（罐裝牛奶仍可選其他日期預購）');return;}
-if(hasDrinkItems&&S.selDate&&S.selTime&&isBlocked(S.selTime.h,S.selTime.m,S.selDate)){
+if(hasDrinkItems&&S.selDate&&S.selTime){
+  const newDrinkCups=items.filter(i=>!i.special).reduce((s,i)=>s+i.qty,0);
   const key=`${dateToISO(S.selDate)}_${pad(S.selTime.h)}:${pad(S.selTime.m)}`;
   const existingCups=(S.slotCounts||{})[key]||0;
-  const ns=nextValidSlot(S.selDate);
-  if(ns){S.selTime=ns;updateDTDisplay();showToast(existingCups>0?`因杯數較多，最快可預訂 ${pad(ns.h)}:${pad(ns.m)}，已自動調整`:`選擇時間已截止，已調整為 ${pad(ns.h)}:${pad(ns.m)}`);}
-  else{const nv=nextValidDate();if(nv){S.selDate=nv.date;S.selTime=nv.slot;updateDTDisplay();showToast(existingCups>0?`因杯數較多，已調整為 ${nv.date.getMonth()+1}/${nv.date.getDate()} ${pad(nv.slot.h)}:${pad(nv.slot.m)}`:`今日時段已截止，已調整為 ${nv.date.getMonth()+1}/${nv.date.getDate()} ${pad(nv.slot.h)}:${pad(nv.slot.m)}`);}}
-  return;
+  const totalCups=existingCups+newDrinkCups;
+  const now2=new Date();const sel2=new Date(S.selDate);sel2.setHours(S.selTime.h,S.selTime.m,0,0);
+  const minLeadMs=Math.max(15*60*1000,totalCups*3*60*1000); // max(15min, cups×3min)
+  const isCongested=existingCups>0;
+  const blocked=isBlocked(S.selTime.h,S.selTime.m,S.selDate)||slotCapacityFull(S.selDate,S.selTime.h,S.selTime.m,newDrinkCups)||(sel2-now2<minLeadMs);
+  if(blocked){
+    // Find next slot with capacity + enough lead time for newDrinkCups
+    let ns=null;
+    for(const{h,m}of allSlots()){
+      if(isBlocked(h,m,S.selDate))continue;
+      if(slotCapacityFull(S.selDate,h,m,newDrinkCups))continue;
+      const slotSel=new Date(S.selDate);slotSel.setHours(h,m,0,0);
+      const slotExisting=(S.slotCounts||{})[`${dateToISO(S.selDate)}_${pad(h)}:${pad(m)}`]||0;
+      const slotMinLead=Math.max(15*60*1000,(slotExisting+newDrinkCups)*3*60*1000);
+      if(slotSel-now2>=slotMinLead){ns={h,m};break;}
+    }
+    let toastMsg=isCongested?`因杯數較多，最快可預訂 ${ns?`${pad(ns.h)}:${pad(ns.m)}`:'明日'}，已自動調整`:newDrinkCups>1?`訂購 ${newDrinkCups} 杯，最早可自取 ${ns?`${pad(ns.h)}:${pad(ns.m)}`:'明日'}，已自動調整`:`選擇時間已截止，已自動調整`;
+    if(ns){S.selTime=ns;updateDTDisplay();showToast(toastMsg);}
+    else{const nv=nextValidDate();if(nv){S.selDate=nv.date;S.selTime=nv.slot;updateDTDisplay();showToast(isCongested?`因杯數較多，已調整為 ${nv.date.getMonth()+1}/${nv.date.getDate()} ${pad(nv.slot.h)}:${pad(nv.slot.m)}`:newDrinkCups>1?`訂購 ${newDrinkCups} 杯，已調整為 ${nv.date.getMonth()+1}/${nv.date.getDate()} ${pad(nv.slot.h)}:${pad(nv.slot.m)}`:`今日時段已截止，已調整為 ${nv.date.getMonth()+1}/${nv.date.getDate()} ${pad(nv.slot.h)}:${pad(nv.slot.m)}`);}}
+    return;
+  }
 }
 const dc=drinkCount();if(dc>=3){document.getElementById('rack-count').textContent=dc;const be=document.getElementById('bear-display');if(S.settings.bearUrl)be.innerHTML=`<img src="${S.settings.bearUrl}" style="width:80px;height:80px;object-fit:contain;border-radius:12px">`;else be.textContent='🐻‍❄️';document.getElementById('rack-modal').classList.add('open');}else{S.hasRack=null;renderReview();showView('v-review');}}
 function setRack(has){S.hasRack=has;document.getElementById('rack-modal').classList.remove('open');if(has)showToast('🐻‍❄️ 謝謝你的環保行動！');renderReview();showView('v-review');}
@@ -591,7 +622,7 @@ async function submitOrder(){
     const iceItems=items.filter(i=>i.special==='icecream');
     if(iceItems.length){await db.runTransaction(async tx=>{const stockRef=db.collection('settings').doc('icestock');const snap=await tx.get(stockRef);const stock=snap.exists?snap.data():{...ICE_DEFAULT};for(const item of iceItems){if((stock[item.id]||0)<item.qty)throw new Error(`${ICE_NAMES[item.id]}庫存不足，請返回調整`);}iceItems.forEach(item=>{stock[item.id]=(stock[item.id]||0)-item.qty;});tx.set(stockRef,stock);tx.set(db.collection('orders').doc(order.id),order);});}
     else await db.collection('orders').doc(order.id).set(order);
-    updateSlotCount(order,1).catch(()=>{});
+    updateSlotCount(order,1).catch(e=>console.error('slotCount +1 failed:',e));
     S.lastOrder=order;
     if(S.settings.ntfyTopic){
       const itemStr=items.map(i=>{const t=i.special?'':(i.temp==='hot'?'(熱)':'(冰)');return`${i.name}${t}×${i.qty}`;}).join(' ');
@@ -638,7 +669,14 @@ async function submitOrder(){
   finally{submitBtn.disabled=false;submitBtn.textContent='✓ 確認預訂';}
 }
 
-function renderSuccess(order){let html=`<h3>訂單明細</h3><div class="osb-row"><span class="osb-key">訂單編號</span><span style="font-family:monospace;font-size:11px">${order.id}</span></div><div class="osb-row"><span class="osb-key">訂購人</span><span>${order.profile.name} / ${order.profile.dept}</span></div>`;if(!order.isMilk)html+=`<div class="osb-row"><span class="osb-key">飲品取餐</span><span>${order.date} ${order.time}</span></div>`;html+=`<div style="height:1px;background:var(--border);margin:8px 0"></div>`;order.items.forEach(i=>{let p=i.payment==='cash'?'現金七折':i.payment==='v1'?'🎫×1':i.payment==='v4'?'🎫×4':i.payment==='v1p5'?'🎫×1+🪙5':'🎫×2';let extra=i.milkDateLabel?`<span style="font-size:11px;color:var(--dim);margin-left:4px">${i.milkDateLabel}</span>`:'';html+=`<div class="osb-row"><span>${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}${extra}</span><span class="osb-key">${p}</span></div>`;});html+=`<div style="height:1px;background:var(--border);margin:8px 0"></div>`;if(order.cash>0)html+=`<div class="osb-row"><span class="osb-key">現金</span><span style="font-weight:700;color:var(--gold)">$${order.cash}</span></div>`;if(order.vouchers>0)html+=`<div class="osb-row"><span class="osb-key">兌換券</span><span style="font-weight:700;color:var(--gold)">×${order.vouchers} 張</span></div>`;if(order.hasRack!=null)html+=`<div class="osb-row"><span class="osb-key">杯架</span><span>${order.hasRack?'✅':'❌'}</span></div>`;document.getElementById('success-summary').innerHTML=html;const hasDrinks=order.items.some(i=>!i.special);document.getElementById('success-sign-reminder').innerHTML=`✍️ <strong>請各位先行在兌換卷上簽名</strong><br>每一張兌換卷都需要簽名才有效`+(hasDrinks?`<br><br>☕ 因咖啡機有高度限制，無法自帶環保杯盛裝`:'');}
+function renderSuccess(order){let html=`<h3>訂單明細</h3><div class="osb-row"><span class="osb-key">訂單編號</span><span style="font-family:monospace;font-size:11px">${order.id}</span></div><div class="osb-row"><span class="osb-key">訂購人</span><span>${order.profile.name} / ${order.profile.dept}</span></div>`;if(!order.isMilk)html+=`<div class="osb-row"><span class="osb-key">飲品取餐</span><span>${order.date} ${order.time}</span></div>`;html+=`<div style="height:1px;background:var(--border);margin:8px 0"></div>`;order.items.forEach(i=>{let p=i.payment==='cash'?'現金七折':i.payment==='v1'?'🎫×1':i.payment==='v4'?'🎫×4':i.payment==='v1p5'?'🎫×1+🪙5':'🎫×2';let extra=i.milkDateLabel?`<span style="font-size:11px;color:var(--dim);margin-left:4px">${i.milkDateLabel}</span>`:'';html+=`<div class="osb-row"><span>${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}${extra}</span><span class="osb-key">${p}</span></div>`;});html+=`<div style="height:1px;background:var(--border);margin:8px 0"></div>`;if(order.cash>0)html+=`<div class="osb-row"><span class="osb-key">現金</span><span style="font-weight:700;color:var(--gold)">$${order.cash}</span></div>`;if(order.vouchers>0)html+=`<div class="osb-row"><span class="osb-key">兌換券</span><span style="font-weight:700;color:var(--gold)">×${order.vouchers} 張</span></div>`;if(order.hasRack!=null)html+=`<div class="osb-row"><span class="osb-key">杯架</span><span>${order.hasRack?'✅':'❌'}</span></div>`;document.getElementById('success-summary').innerHTML=html;const hasDrinks=order.items.some(i=>!i.special);
+  // Dynamic success icon
+  const iconEl=document.getElementById('success-icon');const imgUrl=S.settings.successImageUrl||'';
+  if(imgUrl){iconEl.innerHTML=`<img src="${imgUrl}" style="width:80px;height:80px;object-fit:contain;border-radius:12px">`;}else{iconEl.textContent='✅';}
+  // Dynamic sign reminder
+  const customNote=S.settings.successNote||'';
+  const defaultNote=`✍️ <strong>請各位先行在兌換卷上簽名</strong><br>每一張兌換卷都需要簽名才有效`+(hasDrinks?`<br><br>☕ 因咖啡機有高度限制，無法自帶環保杯盛裝`:'');
+  document.getElementById('success-sign-reminder').innerHTML=customNote?(customNote.replace(/\n/g,'<br>')):defaultNote;}
 function newOrder(){showView('v-order');}
 
 function gcalDate(dateISO,h,m){const d=new Date(dateISO+'T00:00:00');return`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(h)}${pad(m)}00`;}
@@ -650,7 +688,7 @@ function openAdmin(){document.getElementById('pin-overlay').style.display='flex'
 function leaveAdmin(){if(_unsubOrders){_unsubOrders();_unsubOrders=null;}showView('v-order');}
 function checkPin(){const e=document.getElementById('pin-input').value;if(e===S.settings.pin){document.getElementById('pin-overlay').style.display='none';loadAdminUI();subscribeOrders();}else{document.getElementById('pin-error').textContent='PIN 碼錯誤';document.getElementById('pin-input').value='';}}
 document.getElementById('pin-input').addEventListener('keydown',e=>{if(e.key==='Enter')checkPin();});
-function loadAdminUI(){document.getElementById('ntfy-topic').value=S.settings.ntfyTopic||'';document.getElementById('bear-url').value=S.settings.bearUrl||'';renderClosedDatesCalendar();}
+function loadAdminUI(){document.getElementById('ntfy-topic').value=S.settings.ntfyTopic||'';document.getElementById('bear-url').value=S.settings.bearUrl||'';document.getElementById('success-image-url').value=S.settings.successImageUrl||'';document.getElementById('success-note').value=S.settings.successNote||'';renderClosedDatesCalendar();}
 function switchAdminTab(tab){document.querySelectorAll('.atab').forEach((t,i)=>t.classList.toggle('active',['orders','milk','stock','settings'][i]===tab));document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+tab).classList.add('active');if(tab==='stock')renderStockPanel();if(tab==='milk')renderMilkAdmin();}
 function filterOrders(chip){document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));chip.classList.add('active');curFilter=chip.dataset.f;renderOrderList(curFilter);}
 function renderOrderList(filter){
@@ -686,6 +724,7 @@ function renderOrderList(filter){
   <button class="oc-btn${st==='picked_up'?' picked':''}" onclick="updateOrderStatus('${o.id}','picked_up')">☑ 取貨</button>
   <button class="oc-btn${st==='cancelled'?' cancel':''}" onclick="updateOrderStatus('${o.id}','cancelled')">✕ 取消</button>
   ${st!=='pending'?`<button class="oc-btn" onclick="updateOrderStatus('${o.id}','pending')">↩ 復原</button>`:''}
+  <button class="oc-btn" style="color:var(--red);border-color:rgba(224,53,53,.3)" onclick="confirmDeleteOrder('${o.id}')">🗑 刪除</button>
 </div>
 </div>`;}).join('');}
 async function updateOrderStatus(orderId,newStatus){
@@ -693,7 +732,7 @@ async function updateOrderStatus(orderId,newStatus){
     const o=S._allOrders.find(x=>x.id===orderId);
     await db.collection('orders').doc(orderId).update({status:newStatus});
     if(newStatus==='cancelled'&&o){
-      updateSlotCount(o,-1).catch(()=>{});
+      updateSlotCount(o,-1).catch(e=>console.error('slotCount -1 failed:',e));
       // 還冰棒庫存
       const iceItems=(o.items||[]).filter(i=>i.special==='icecream');
       if(iceItems.length){
@@ -715,6 +754,32 @@ async function updateOrderStatus(orderId,newStatus){
     else showToast(newStatus==='done'?'✅ 已完成':'🛍 已取貨');
   }catch(e){showToast('❌ 更新失敗：'+e.message);}
 }
+function confirmDeleteOrder(orderId){
+  const pin=prompt('請輸入管理員 PIN 碼確認刪除');
+  if(pin===null)return;
+  if(pin!==S.settings.pin){showToast('❌ PIN 碼錯誤，取消刪除');return;}
+  deleteOrder(orderId);
+}
+async function deleteOrder(orderId){
+  try{
+    const o=S._allOrders.find(x=>x.id===orderId);
+    // Restore stock and slot only if not already cancelled
+    if(o&&(o.status||'')!=='cancelled'){
+      updateSlotCount(o,-1).catch(()=>{});
+      const iceItems=(o.items||[]).filter(i=>i.special==='icecream');
+      if(iceItems.length){
+        const stockRef=db.collection('settings').doc('icestock');
+        const snap=await stockRef.get();
+        const stock=snap.exists?snap.data():{...ICE_DEFAULT};
+        iceItems.forEach(i=>{stock[i.id]=(stock[i.id]||0)+i.qty;S.iceStock[i.id]=(S.iceStock[i.id]||0)+i.qty;});
+        await stockRef.set(stock);
+        buildMenu();
+      }
+    }
+    await db.collection('orders').doc(orderId).delete();
+    showToast('🗑 訂單已刪除');
+  }catch(e){showToast('❌ 刪除失敗：'+e.message);}
+}
 function renderMilkAdmin(){
   const orders=S._allOrders;const deliveries=getMilkDeliveries().slice(0,5);const el=document.getElementById('milk-admin-content');if(!el)return;
   const milkOrdered=S.settings.milkOrdered||{};
@@ -726,22 +791,19 @@ function renderMilkAdmin(){
     const isPast=new Date()>deadline;
     const dateISO=dateToISO(deliveryDate);
     const isOrdered=!!milkOrdered[dateISO];
+    const isPaid=!!(S.settings.milkPaid||{})[dateISO];
     const peopleJson=JSON.stringify(milkOrdersForDay.map(({o,qty})=>({name:o.profile.name,dept:o.profile.dept,qty})));
     const dLabel=`${deliveryDate.getMonth()+1}/${deliveryDate.getDate()}`;
-    // 叫貨截止提醒 calendar URL (orange)
-    const dlStart=`${deadline.getFullYear()}${pad(deadline.getMonth()+1)}${pad(deadline.getDate())}T${pad(deadline.getHours())}0000`;
-    const dlEnd=`${deadline.getFullYear()}${pad(deadline.getMonth()+1)}${pad(deadline.getDate())}T${pad(deadline.getHours()+1)}0000`;
     const orderQty=totalQty>0?totalQty+1:0;
-    const dlDetails=`到貨日期：${label}\n$68/罐 × ${orderQty}罐 ＝ $${68*orderQty}`;
-    const reminderUrl=gcalUrl(`開元叫貨 牛奶×${orderQty}罐`,dlStart,dlEnd,dlDetails,6);// 6=Tangerine orange
     html+=`<div class="delivery-card">
-<h3>${label}到貨 ${isOrdered?'<span class="milk-ordered-badge">✅ 已叫貨</span>':''}<span style="font-size:12px;color:${isPast?'var(--red)':'var(--dim)'}">${isPast?'❌已截單':`截止 ${deadline.getMonth()+1}/${deadline.getDate()} ${pad(deadline.getHours())}:00`}</span></h3>
+<h3>${label}到貨 ${isOrdered?'<span class="milk-ordered-badge">✅ 已叫貨</span>':''}${isPaid?'<span class="milk-ordered-badge" style="background:rgba(68,136,238,.15);color:#88bbff;border:1px solid rgba(68,136,238,.4)">💰 已請款</span>':''}<span style="font-size:12px;color:${isPast?'var(--red)':'var(--dim)'}">${isPast?'❌已截單':`截止 ${deadline.getMonth()+1}/${deadline.getDate()} ${pad(deadline.getHours())}:00`}</span></h3>
 <div class="delivery-count">${totalQty} 瓶</div>
-<div style="font-size:12px;color:var(--dim);margin-bottom:8px">建議叫貨：<strong style="color:var(--gold)">${totalQty>0?totalQty+1:0}</strong> 瓶（含+1緩衝）</div>
+<div style="font-size:12px;color:var(--dim);margin-bottom:8px">建議叫貨：<strong style="color:var(--gold)">${orderQty}</strong> 瓶（含+1緩衝）</div>
 ${totalQty>0?milkOrdersForDay.map(({o,qty})=>`<div class="milk-order-row">${o.profile.name}（${o.profile.dept}）：${qty} 瓶</div>`).join(''):'<div style="font-size:12px;color:var(--dim)">目前無訂單</div>'}
+${orderQty>0?`<div style="font-size:13px;color:var(--gold);margin:8px 0 4px;font-weight:600">💰 $68 × ${orderQty}瓶 = $${68*orderQty}</div>`:''}
 <div class="milk-action-row">
   <button onclick="toggleMilkOrdered('${dateISO}')" style="flex:1;padding:8px;border-radius:8px;border:1px solid ${isOrdered?'rgba(58,170,80,.5)':'var(--border)'};background:${isOrdered?'rgba(58,170,80,.15)':'var(--surf2)'};color:${isOrdered?'#5dd87a':'var(--text)'};font-size:13px;cursor:pointer">${isOrdered?'✅ 已叫貨（點擊取消）':'📦 標記已叫貨'}</button>
-  <a href="${reminderUrl}" target="_blank" rel="noopener" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(212,160,32,.4);background:rgba(212,160,32,.1);color:#f0d080;font-size:13px;cursor:pointer;text-decoration:none;text-align:center">📅 叫貨截止提醒</a>
+  <button onclick="toggleMilkPaid('${dateISO}')" style="flex:1;padding:8px;border-radius:8px;border:1px solid ${isPaid?'rgba(68,136,238,.5)':'var(--border)'};background:${isPaid?'rgba(68,136,238,.15)':'var(--surf2)'};color:${isPaid?'#88bbff':'var(--text)'};font-size:13px;cursor:pointer">${isPaid?'💰 已請款（點擊取消）':'💳 標記已請款'}</button>
 </div>
 ${totalQty>0?`<button onclick='copyMilkNotice(${JSON.stringify(dLabel)},${peopleJson})' style="margin-top:6px;width:100%;padding:8px;border-radius:8px;border:1px solid rgba(68,136,238,.3);background:rgba(68,136,238,.08);color:#88bbff;font-size:13px;cursor:pointer">📋 複製到貨通知文字</button>`:''}
 </div>`;
@@ -753,6 +815,14 @@ async function toggleMilkOrdered(dateISO){
   try{await db.collection('settings').doc('admin').set({milkOrdered:S.settings.milkOrdered},{merge:true});}catch(e){}
   renderMilkAdmin();
   showToast(S.settings.milkOrdered[dateISO]?'✅ 已標記叫貨':'已取消叫貨標記');
+}
+async function toggleMilkPaid(dateISO){
+  const cur=S.settings.milkPaid||{};
+  if(cur[dateISO])delete cur[dateISO];else cur[dateISO]=true;
+  S.settings.milkPaid={...cur};
+  try{await db.collection('settings').doc('admin').set({milkPaid:S.settings.milkPaid},{merge:true});}catch(e){}
+  renderMilkAdmin();
+  showToast(S.settings.milkPaid[dateISO]?'💰 已標記請款':'已取消請款標記');
 }
 function copyMilkNotice(dateLabel,orders){const people=orders.map(o=>`${o.name}（${o.dept}）${o.qty}瓶｜共 ${o.qty*4} 張券`).join('\n');const pickupTime=S.settings.milkPickupTime||'17:00';const loc=S.settings.milkLocation||'';const atLoc=loc?`至${loc}領取`:'取貨';const text=`🥛 罐裝牛奶到貨囉！\n\n${dateLabel} 取貨同仁：\n${people}\n\n今天 ${pickupTime} 前可${atLoc}，請注意咖啡券有效期限並簽名，謝謝！`;navigator.clipboard?.writeText(text).then(()=>showToast('✅ 通知文字已複製，請貼到 LINE / 群組通知大家')).catch(()=>{alert(text);});}
 function renderStockPanel(){document.getElementById('ice-stock-rows').innerHTML=ICE_IDS.map(id=>`<div class="ice-flavor-row"><span class="ice-flavor-name">${ICE_HEARTS[id]} ${ICE_NAMES[id]}</span><div class="ifqc"><button onclick="adjIce('${id}',-1)">−</button><div class="ifn" id="is-${id}">${S.iceStock[id]??0}</div><button onclick="adjIce('${id}',1)">+</button></div></div>`).join('');const orders=S._allOrders;const today=new Date().toLocaleDateString('zh-TW');const bf={};ICE_IDS.forEach(id=>{bf[id]=0;});orders.filter(o=>o.date===today).flatMap(o=>(o.items||[]).filter(i=>i.special==='icecream')).forEach(i=>{bf[i.id]=(bf[i.id]||0)+i.qty;});const total=Object.values(bf).reduce((s,v)=>s+v,0);document.getElementById('stock-today-summary').innerHTML=`<div style="font-size:14px;font-weight:600;margin-bottom:8px">今日冰棒訂單（${today}）：共 ${total} 支</div>`+ICE_IDS.filter(id=>bf[id]>0).map(id=>`<div style="font-size:13px;color:var(--dim);margin-bottom:4px">${ICE_HEARTS[id]} ${ICE_NAMES[id]}：${bf[id]} 支</div>`).join('')+(total===0?'<div style="font-size:13px;color:var(--dim)">今日尚無冰棒訂單</div>':'');}
@@ -793,7 +863,7 @@ function toggleClosedDate(iso){const dates=S.settings.closedDates||[];S.settings
 function prevCalMonth(){_calM--;if(_calM<0){_calM=11;_calY--;}renderClosedDatesCalendar();}
 function nextCalMonth(){_calM++;if(_calM>11){_calM=0;_calY++;}renderClosedDatesCalendar();}
 
-async function saveSettings(){const np=document.getElementById('new-pin').value,np2=document.getElementById('new-pin2').value;if(np){if(np!==np2){showToast('兩次 PIN 碼不一致');return;}if(!/^\d{4,8}$/.test(np)){showToast('PIN 碼需為4-8位數字');return;}S.settings.pin=np;localStorage.setItem('adminPin',np);document.getElementById('new-pin').value='';document.getElementById('new-pin2').value='';}const cfg={ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
+async function saveSettings(){const np=document.getElementById('new-pin').value,np2=document.getElementById('new-pin2').value;if(np){if(np!==np2){showToast('兩次 PIN 碼不一致');return;}if(!/^\d{4,8}$/.test(np)){showToast('PIN 碼需為4-8位數字');return;}S.settings.pin=np;localStorage.setItem('adminPin',np);document.getElementById('new-pin').value='';document.getElementById('new-pin2').value='';}const cfg={ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),successImageUrl:document.getElementById('success-image-url').value.trim(),successNote:document.getElementById('success-note').value,closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
 async function clearAllOrders(){if(!confirm('確定要清除所有訂單？此操作無法復原。'))return;const snap=await db.collection('orders').get();const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));await batch.commit();showToast('已清除');}
 async function testNtfy(){const topic=document.getElementById('ntfy-topic').value.trim();const res=document.getElementById('ntfy-test-result');if(!topic){res.style.color='var(--red)';res.textContent='請先填入 Topic 名稱';return;}res.style.color='var(--dim)';res.textContent='傳送中...';try{const r=await fetch(`https://ntfy.sh/${topic}`,{method:'POST',body:'Test - drink order system connected'});if(r.ok){res.style.color='var(--green)';res.textContent='✅ 已送出，請確認手機是否收到';}else{res.style.color='var(--red)';res.textContent=`❌ 失敗（${r.status}）`;}}catch(e){res.style.color='var(--red)';res.textContent='❌ 網路錯誤：'+e.message;}}
 
