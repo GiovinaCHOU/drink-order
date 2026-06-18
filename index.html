@@ -531,7 +531,7 @@ function addToCart(itemId){
     const milkISO=S.selMilkDate.toISOString();
     const existing=S.cart.find(e=>e.id===itemId&&e.milkDateISO===milkISO);
     if(existing)existing.qty+=stg.qty;
-    else S.cart.push({cartId:cartUniqueId(),id:itemId,name:item.name,temp:'cold',qty:stg.qty,payment:'v4',special:'milk',milkDate:S.selMilkDate,milkDateISO:milkISO,milkDateLabel:`${S.selMilkDate.getMonth()+1}/${S.selMilkDate.getDate()} 週${DAYS_ZH[S.selMilkDate.getDay()]} 取貨`});
+    else S.cart.push({cartId:cartUniqueId(),id:itemId,name:item.name,temp:'cold',qty:stg.qty,payment:'v4',special:'milk',milkDate:S.selMilkDate,milkDateISO:milkISO,milkDateLabel:`${S.selMilkDate.getMonth()+1}/${S.selMilkDate.getDate()} 週${DAYS_ZH[S.selMilkDate.getDay()]} ${S.settings.milkPickupTime||'15:00'} 取貨`});
   }else if(item.special==='icecream'){
     const inCart=S.cart.filter(e=>e.id===itemId).reduce((s,e)=>s+e.qty,0);
     const avail=(S.iceStock[itemId]??0)-inCart;
@@ -634,27 +634,6 @@ async function submitOrder(){
         const details=`${itemStr}\nv:${vouchers} cash:$${cash}`;
         calLines.push(gcalUrl(title,startStr,endStr,details+'',1));// 1=Lavender 薰衣草色
       }
-      // 牛奶事件：13:30（milkDateISO 是 UTC 全格式，用 new Date(iso) 取本地日期）
-      const milkItems=items.filter(i=>i.special==='milk');
-      const byMDate={};milkItems.forEach(i=>{const k=i.milkDateISO||'';if(!byMDate[k])byMDate[k]={qty:0};byMDate[k].qty+=i.qty;});
-      const deliveries4ntfy=getMilkDeliveries();
-      Object.entries(byMDate).forEach(([iso,{qty}])=>{
-        if(!iso)return;
-        const d=new Date(iso);
-        const milkDateISO=dateToISO(d);
-        const dLabel=`${d.getMonth()+1}/${d.getDate()}`;
-        const deliv=deliveries4ntfy.find(dv=>dateToISO(dv.deliveryDate)===milkDateISO);
-        if(deliv){
-          const dl=deliv.deadline;// deadline = 截止訂購日 17:00
-          const dlS=`${dl.getFullYear()}${pad(dl.getMonth()+1)}${pad(dl.getDate())}T${pad(dl.getHours())}0000`;
-          const dlE=`${dl.getFullYear()}${pad(dl.getMonth()+1)}${pad(dl.getDate())}T${pad(dl.getHours())}3000`;
-          const reminderNote='';
-          // 牛奶個人事件：截止訂購日 17:00，鶴色 colorId=4
-          calLines.push(gcalUrl(`${order.profile.name}｜罐裝牛奶×${qty}`,dlS,dlE,order.profile.dept+reminderNote,4));// 4=Flamingo 鶴色
-          // 叫貨截止提醒：同時間，鶴色 colorId=4
-          calLines.push(gcalUrl(`開元叫貨 牛奶 ${dLabel}`,dlS,dlE,`到貨日期：${dLabel}\n$68/罐 × ? 罐 ＝ ?`+reminderNote,4));// 4=Flamingo 鶴色
-        }
-      });
       if(calLines.length)msg+='\n📅 '+calLines.join('\n📅 ');
       fetch(`https://ntfy.sh/${S.settings.ntfyTopic}`,{method:'POST',body:msg}).catch(()=>{});
     }
@@ -786,6 +765,7 @@ function renderMilkAdmin(){
     const isPaid=!!(S.settings.milkPaid||{})[dateISO];
     const peopleJson=JSON.stringify(milkOrdersForDay.map(({o,qty})=>({name:o.profile.name,dept:o.profile.dept,qty,orderId:o.id})));
     const dLabel=`${deliveryDate.getMonth()+1}/${deliveryDate.getDate()}`;
+    const _dl=deadline;const _dlS=`${_dl.getFullYear()}${pad(_dl.getMonth()+1)}${pad(_dl.getDate())}T${pad(_dl.getHours())}0000`;const _dlE=`${_dl.getFullYear()}${pad(_dl.getMonth()+1)}${pad(_dl.getDate())}T${pad(_dl.getHours())}3000`;const _calDetails=`到貨日期：${dLabel}\n`+milkOrdersForDay.map(({o,qty})=>`${o.profile.name}（${o.profile.dept}）${qty}瓶`).join('\n')+(totalQty>0?`\n$68/罐 × ${totalQty} 瓶 = $${68*totalQty}`:'');const milkCalUrl=gcalUrl(`開元叫貨 牛奶 ${dLabel}`,_dlS,_dlE,_calDetails,4);
     html+=`<div class="delivery-card" style="${isSkipped?'opacity:0.55;border-color:rgba(224,53,53,.3)':''}">
 <h3>${label}到貨 ${isSkipped?'<span class="milk-ordered-badge" style="background:rgba(224,53,53,.12);color:var(--red);border:1px solid rgba(224,53,53,.35)">🚫 已跳過</span>':''}${!isSkipped&&isOrdered?'<span class="milk-ordered-badge">✅ 已叫貨</span>':''}${!isSkipped&&isPaid?'<span class="milk-ordered-badge" style="background:rgba(68,136,238,.15);color:#88bbff;border:1px solid rgba(68,136,238,.4)">💰 已請款</span>':''}<span style="font-size:12px;color:${isPast?'var(--red)':'var(--dim)'}">${isPast?'❌已截單':`截止 ${deadline.getMonth()+1}/${deadline.getDate()} ${pad(deadline.getHours())}:00`}</span></h3>
 ${isSkipped?`<div style="font-size:13px;color:var(--red);margin-bottom:10px">此日已標記停送，使用者選單中不顯示此取貨日</div>`:`<div class="delivery-count">${totalQty} 瓶</div>
@@ -798,6 +778,7 @@ ${totalQty>0?`<div style="font-size:14px;color:var(--gold);margin:10px 0 4px;fon
   <button onclick="toggleMilkSkip('${dateISO}')" style="flex:${isSkipped?'1':'0 0 auto'};padding:8px 12px;border-radius:8px;border:1px solid ${isSkipped?'rgba(58,170,80,.4)':'rgba(224,53,53,.3)'};background:${isSkipped?'rgba(58,170,80,.1)':'rgba(224,53,53,.08)'};color:${isSkipped?'#5dd87a':'var(--red)'};font-size:13px;cursor:pointer">${isSkipped?'↩ 恢復此次到貨':'🚫 跳過此次'}</button>
 </div>
 ${!isSkipped&&totalQty>0?`<button onclick='copyMilkNotice(${JSON.stringify(dLabel)},${peopleJson},${JSON.stringify(dateISO)})' style="margin-top:6px;width:100%;padding:8px;border-radius:8px;border:1px solid rgba(68,136,238,.3);background:rgba(68,136,238,.08);color:#88bbff;font-size:13px;cursor:pointer">📋 複製到貨通知文字</button>`:''}
+${!isSkipped?`<a href="${milkCalUrl}" target="_blank" rel="noopener" style="display:block;margin-top:6px;width:100%;padding:8px;border-radius:8px;border:1px solid rgba(212,160,32,.3);background:rgba(212,160,32,.08);color:var(--gold);font-size:13px;text-decoration:none;text-align:center;box-sizing:border-box">📅 叫貨截止提醒加入行事曆</a>`:''}
 </div>`;
   });}el.innerHTML=html;}
 async function toggleMilkOrdered(dateISO){
@@ -827,7 +808,7 @@ async function toggleMilkSkip(dateISO){
   showToast(cur.includes(dateISO)?'🚫 已標記跳過，使用者選單不顯示此日':'↩ 已恢復此次到貨');
 }
 
-function copyMilkNotice(dateLabel,orders,dateISO){const picked=S.settings.milkPickedUp||{};const unpicked=orders.filter(o=>!picked[`${dateISO}_${o.orderId}`]);if(!unpicked.length){showToast('所有人已取貨，無需複製');return;}const people=unpicked.map(o=>`${o.name}（${o.dept}）${o.qty}瓶｜共 ${o.qty*4} 張券`).join('\n');const pickupTime=S.settings.milkPickupTime||'15:00';const loc=S.settings.milkLocation||'';const atLoc=loc?`至${loc}領取`:'取貨';const text=`🥛 罐裝牛奶到貨囉！\n\n${dateLabel} 取貨同仁：\n${people}\n\n今天 ${pickupTime} 前可${atLoc}，請注意咖啡券有效期限並簽名，謝謝！`;navigator.clipboard?.writeText(text).then(()=>showToast('✅ 通知文字已複製，請貼到 LINE / 群組通知大家')).catch(()=>{alert(text);});}
+function copyMilkNotice(dateLabel,orders,dateISO){const picked=S.settings.milkPickedUp||{};const unpicked=orders.filter(o=>!picked[`${dateISO}_${o.orderId}`]);if(!unpicked.length){showToast('所有人已取貨，無需複製');return;}const people=unpicked.map(o=>`${o.name}（${o.dept}）${o.qty}瓶｜共 ${o.qty*4} 張券`).join('\n');const loc=S.settings.milkLocation||'';const atLoc=loc?`至${loc}領取`:'取貨';const text=`🥛 罐裝牛奶到貨囉！\n\n${dateLabel} 取貨同仁：\n${people}\n\n今天下班前可${atLoc}，請注意咖啡券有效期限並簽名，謝謝！`;navigator.clipboard?.writeText(text).then(()=>showToast('✅ 通知文字已複製，請貼到 LINE / 群組通知大家')).catch(()=>{alert(text);});}
 function renderStockPanel(){document.getElementById('ice-stock-rows').innerHTML=ICE_IDS.map(id=>`<div class="ice-flavor-row"><span class="ice-flavor-name">${ICE_HEARTS[id]} ${ICE_NAMES[id]}</span><div class="ifqc"><button onclick="adjIce('${id}',-1)">−</button><div class="ifn" id="is-${id}">${S.iceStock[id]??0}</div><button onclick="adjIce('${id}',1)">+</button></div></div>`).join('');const orders=S._allOrders;const today=new Date().toLocaleDateString('zh-TW');const bf={};ICE_IDS.forEach(id=>{bf[id]=0;});orders.filter(o=>o.date===today).flatMap(o=>(o.items||[]).filter(i=>i.special==='icecream')).forEach(i=>{bf[i.id]=(bf[i.id]||0)+i.qty;});const total=Object.values(bf).reduce((s,v)=>s+v,0);document.getElementById('stock-today-summary').innerHTML=`<div style="font-size:14px;font-weight:600;margin-bottom:8px">今日冰棒訂單（${today}）：共 ${total} 支</div>`+ICE_IDS.filter(id=>bf[id]>0).map(id=>`<div style="font-size:13px;color:var(--dim);margin-bottom:4px">${ICE_HEARTS[id]} ${ICE_NAMES[id]}：${bf[id]} 支</div>`).join('')+(total===0?'<div style="font-size:13px;color:var(--dim)">今日尚無冰棒訂單</div>':'');}
 function adjIce(id,delta){S.iceStock[id]=Math.max(0,(S.iceStock[id]??0)+delta);const el=document.getElementById('is-'+id);if(el)el.textContent=S.iceStock[id];}
 async function saveIceStock(){try{await db.collection('settings').doc('icestock').set(S.iceStock);showToast('✅ 庫存已儲存');buildMenu();}catch(e){showToast('❌ 儲存失敗');}}
