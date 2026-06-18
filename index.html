@@ -447,10 +447,10 @@ const MENU=[
   {id:'bottled',label:'🍼 罐裝牛奶',special:'milk',items:[{id:'milk1',name:'罐裝牛奶',price:0,temp:'cold'}]},
   {id:'icecream',label:'🍦 冰棒',special:'icecream',items:ICE_IDS.map(id=>({id,name:ICE_NAMES[id]+'冰棒',price:0,temp:'cold'}))},
 ];
-let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'15:00',milkOrdered:{},milkPaid:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:'',milkPickedUp:{}},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
+let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'9117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'15:00',milkOrdered:{},milkPaid:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:'',milkPickedUp:{}},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
 let db=null,_unsubOrders=null,_unsubStock=null,curFilter='all',activeTab='coffee',_fixedMonth=null;
 async function init(){
-  S.settings.pin=localStorage.getItem('adminPin')||'60659117';
+
   try{
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     db=firebase.firestore();
@@ -466,11 +466,11 @@ async function init(){
   }catch(e){console.error(e);showToast('⚠️ 資料庫連線失敗，請檢查網路');showView('v-profile');}
 }
 async function loadStockFromDB(){const s=await db.collection('settings').doc('icestock').get();if(s.exists)S.iceStock={...ICE_DEFAULT,...s.data()};}
-async function loadSettingsFromDB(){const s=await db.collection('settings').doc('admin').get();if(s.exists){const d=s.data();S.settings={...S.settings,...d,pin:S.settings.pin};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}}
+async function loadSettingsFromDB(){const s=await db.collection('settings').doc('admin').get();if(s.exists){const d=s.data();S.settings={...S.settings,...d};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}}
 function subscribeStock(){if(_unsubStock)_unsubStock();_unsubStock=db.collection('settings').doc('icestock').onSnapshot(s=>{if(s.exists){S.iceStock={...ICE_DEFAULT,...s.data()};buildMenu();}});}
 function subscribeOrders(){if(_unsubOrders)_unsubOrders();_unsubOrders=db.collection('orders').orderBy('createdAt','desc').limit(300).onSnapshot(s=>{S._allOrders=s.docs.map(d=>d.data());renderOrderList(curFilter);});}
 let _unsubSlots=null,_unsubSettings=null;
-function subscribeSettings(){if(_unsubSettings)_unsubSettings();_unsubSettings=db.collection('settings').doc('admin').onSnapshot(s=>{if(s.exists){const d=s.data();S.settings={...S.settings,...d,pin:S.settings.pin};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}renderNotices();buildMilkDateChips();},e=>console.warn('settings sync error:',e));}
+function subscribeSettings(){if(_unsubSettings)_unsubSettings();_unsubSettings=db.collection('settings').doc('admin').onSnapshot(s=>{if(s.exists){const d=s.data();S.settings={...S.settings,...d};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}renderNotices();buildMilkDateChips();},e=>console.warn('settings sync error:',e));}
 function subscribeSlotCounts(){if(_unsubSlots)_unsubSlots();_unsubSlots=db.collection('settings').doc('slotCounts').onSnapshot(s=>{S.slotCounts=s.exists?s.data():{};if(S.selDate&&S.selTime&&document.getElementById('v-order').classList.contains('active'))checkTimeValidity();},e=>{console.warn('slotCounts subscription error:',e);});}
 // ── Time watcher: auto-jump if current slot expires ──
 function startTimeWatcher(){setInterval(checkTimeValidity,30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkTimeValidity();});}
@@ -754,7 +754,7 @@ async function deleteOrder(orderId){
 function renderMilkAdmin(){
   const orders=S._allOrders;const deliveries=getMilkDeliveries({includeSkipped:true}).slice(0,6);const el=document.getElementById('milk-admin-content');if(!el)return;
   const milkOrdered=S.settings.milkOrdered||{};
-  let html=`<div style="background:rgba(212,160,32,.08);border:1px solid rgba(212,160,32,.3);border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px;color:#f0d080;line-height:1.6">📦 <strong>叫貨提醒</strong><br>確認各到貨日訂單後向廠商叫貨，可自行調整緩衝瓶數或跳過不出貨日。<br><span style="color:var(--dim)">廠商：週一、三、五 13:00 到貨</span></div>`;
+  let html=`<div style="background:rgba(212,160,32,.08);border:1px solid rgba(212,160,32,.3);border-radius:10px;padding:14px;margin-bottom:12px;font-size:13px;color:#f0d080;line-height:1.6">📦 請於截止當日叫貨，注意假期詢問廠商是否跳過出貨日。永美門市牛奶需自行下單或加量。</div>`;
   if(!deliveries.length){html+='<div class="empty-state">📭 近期無可用取貨日</div>';}
   else{deliveries.forEach(({deliveryDate,deadline,label,isSkipped})=>{
     let totalQty=0;const milkOrdersForDay=[];
@@ -765,7 +765,7 @@ function renderMilkAdmin(){
     const isPaid=!!(S.settings.milkPaid||{})[dateISO];
     const peopleJson=JSON.stringify(milkOrdersForDay.map(({o,qty})=>({name:o.profile.name,dept:o.profile.dept,qty,orderId:o.id})));
     const dLabel=`${deliveryDate.getMonth()+1}/${deliveryDate.getDate()}`;
-    const _dl=deadline;const _dlS=`${_dl.getFullYear()}${pad(_dl.getMonth()+1)}${pad(_dl.getDate())}T${pad(_dl.getHours())}0000`;const _dlE=`${_dl.getFullYear()}${pad(_dl.getMonth()+1)}${pad(_dl.getDate())}T${pad(_dl.getHours())}3000`;const _calDetails=`到貨日期：${dLabel}\n`+milkOrdersForDay.map(({o,qty})=>`${o.profile.name}（${o.profile.dept}）${qty}瓶`).join('\n')+(totalQty>0?`\n$68/罐 × ${totalQty} 瓶 = $${68*totalQty}`:'');const milkCalUrl=gcalUrl(`開元叫貨 牛奶 ${dLabel}`,_dlS,_dlE,_calDetails,4);
+    const _dl=deadline;const _dlS=`${_dl.getFullYear()}${pad(_dl.getMonth()+1)}${pad(_dl.getDate())}T${pad(_dl.getHours())}0000`;const _dlE=`${_dl.getFullYear()}${pad(_dl.getMonth()+1)}${pad(_dl.getDate())}T${pad(_dl.getHours())}3000`;const _calPeople=milkOrdersForDay.map(({o,qty})=>{const isYM=o.profile.dept.includes('永美');return`${o.profile.name}（${o.profile.dept}）${qty}瓶${isYM?'':'｜共 '+(qty*4)+' 券'}`;}).join('\n');const _calDetails=`到貨日：${dLabel}\n-\n${_calPeople}\n-\n$68/罐 × ${totalQty} 瓶 = $${68*totalQty}`;const _calTitle=`開元 牛奶×${totalQty}｜${dLabel} 到貨 $${68*totalQty}`;const milkCalUrl=gcalUrl(_calTitle,_dlS,_dlE,_calDetails,4);
     html+=`<div class="delivery-card" style="${isSkipped?'opacity:0.55;border-color:rgba(224,53,53,.3)':''}">
 <h3>${label}到貨 ${isSkipped?'<span class="milk-ordered-badge" style="background:rgba(224,53,53,.12);color:var(--red);border:1px solid rgba(224,53,53,.35)">🚫 已跳過</span>':''}${!isSkipped&&isOrdered?'<span class="milk-ordered-badge">✅ 已叫貨</span>':''}${!isSkipped&&isPaid?'<span class="milk-ordered-badge" style="background:rgba(68,136,238,.15);color:#88bbff;border:1px solid rgba(68,136,238,.4)">💰 已請款</span>':''}<span style="font-size:12px;color:${isPast?'var(--red)':'var(--dim)'}">${isPast?'❌已截單':`截止 ${deadline.getMonth()+1}/${deadline.getDate()} ${pad(deadline.getHours())}:00`}</span></h3>
 ${isSkipped?`<div style="font-size:13px;color:var(--red);margin-bottom:10px">此日已標記停送，使用者選單中不顯示此取貨日</div>`:`<div class="delivery-count">${totalQty} 瓶</div>
@@ -845,7 +845,7 @@ function renderClosedDatesCalendar(){
 function toggleClosedDate(iso){const dates=S.settings.closedDates||[];S.settings.closedDates=dates.includes(iso)?dates.filter(d=>d!==iso):[...dates,iso];renderClosedDatesCalendar();}
 function prevCalMonth(){_calM--;if(_calM<0){_calM=11;_calY--;}renderClosedDatesCalendar();}
 function nextCalMonth(){_calM++;if(_calM>11){_calM=0;_calY++;}renderClosedDatesCalendar();}
-async function saveSettings(){const np=document.getElementById('new-pin').value,np2=document.getElementById('new-pin2').value;if(np){if(np!==np2){showToast('兩次 PIN 碼不一致');return;}if(!/^\d{4,8}$/.test(np)){showToast('PIN 碼需為4-8位數字');return;}S.settings.pin=np;localStorage.setItem('adminPin',np);document.getElementById('new-pin').value='';document.getElementById('new-pin2').value='';}const cfg={ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),successImageUrl:document.getElementById('success-image-url').value.trim(),successNote:document.getElementById('success-note').value,holidayNote:document.getElementById('holiday-note').value,orderNote:document.getElementById('order-note').value,milkPickupTime:document.getElementById('milk-pickup-time').value.trim()||'15:00',closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};renderNotices();try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
+async function saveSettings(){const np=document.getElementById('new-pin').value,np2=document.getElementById('new-pin2').value;if(np){if(np!==np2){showToast('兩次 PIN 碼不一致');return;}if(!/^\d{4,8}$/.test(np)){showToast('PIN 碼需為4-8位數字');return;}S.settings.pin=np;document.getElementById('new-pin').value='';document.getElementById('new-pin2').value='';}const cfg={pin:S.settings.pin,ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),successImageUrl:document.getElementById('success-image-url').value.trim(),successNote:document.getElementById('success-note').value,holidayNote:document.getElementById('holiday-note').value,orderNote:document.getElementById('order-note').value,milkPickupTime:document.getElementById('milk-pickup-time').value.trim()||'15:00',closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};renderNotices();try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
 async function clearAllOrders(){if(!confirm('確定要清除所有訂單？此操作無法復原。'))return;const snap=await db.collection('orders').get();const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));await batch.commit();showToast('已清除');}
 async function testNtfy(){const topic=document.getElementById('ntfy-topic').value.trim();const res=document.getElementById('ntfy-test-result');if(!topic){res.style.color='var(--red)';res.textContent='請先填入 Topic 名稱';return;}res.style.color='var(--dim)';res.textContent='傳送中...';try{const r=await fetch(`https://ntfy.sh/${topic}`,{method:'POST',body:'Test - drink order system connected'});if(r.ok){res.style.color='var(--green)';res.textContent='✅ 已送出，請確認手機是否收到';}else{res.style.color='var(--red)';res.textContent=`❌ 失敗（${r.status}）`;}}catch(e){res.style.color='var(--red)';res.textContent='❌ 網路錯誤：'+e.message;}}
 let _tt;function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2500);}
