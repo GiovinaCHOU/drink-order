@@ -569,23 +569,23 @@ function pickMilkDate(i){if(!S._milkDeliveries[i])return;S.selMilkDate=S._milkDe
 // ── Review ──
 function goReview(){const items=cartItems();if(!items.length){showToast('請先加入品項');return;}if(!S.profile){showToast('請先填寫個人資料');showView('v-profile');return;}const hasDrinkItems=items.some(i=>!i.special||i.special==='icecream');if(hasDrinkItems&&(!S.selDate||!S.selTime)){showToast('請先選擇飲品取餐時間');return;}if(items.some(i=>i.special!=='milk')&&S.selDate&&isDateClosed(S.selDate)){showToast('該日為公休日，不開放飲品及冰棒訂購（罐裝牛奶仍可選其他日期預購）');return;}
 if(hasDrinkItems&&S.selDate&&S.selTime){
-  const newDrinkCups=items.filter(i=>!i.special||i.special==='icecream').reduce((s,i)=>s+i.qty,0);
+  const newDrinkCups=items.filter(i=>!i.special).reduce((s,i)=>s+i.qty,0);
   const key=`${dateToISO(S.selDate)}_${pad(S.selTime.h)}:${pad(S.selTime.m)}`;
   const existingCups=(S.slotCounts||{})[key]||0;
   const totalCups=existingCups+newDrinkCups;
   const now2=new Date();const sel2=new Date(S.selDate);sel2.setHours(S.selTime.h,S.selTime.m,0,0);
-  const minLeadMs=Math.max(15*60*1000,totalCups*3*60*1000); // max(15min, cups×3min)
+  const minLeadMs=newDrinkCups>0?Math.max(15*60*1000,totalCups*3*60*1000):15*60*1000;
   const isCongested=existingCups>0;
-  const blocked=isBlocked(S.selTime.h,S.selTime.m,S.selDate)||slotCapacityFull(S.selDate,S.selTime.h,S.selTime.m,newDrinkCups)||(sel2-now2<minLeadMs);
+  const blocked=isBlocked(S.selTime.h,S.selTime.m,S.selDate)||(newDrinkCups>0&&slotCapacityFull(S.selDate,S.selTime.h,S.selTime.m,newDrinkCups))||(sel2-now2<minLeadMs);
   if(blocked){
     // Find next slot with capacity + enough lead time for newDrinkCups
     let ns=null;
     for(const{h,m}of allSlots()){
       if(isBlocked(h,m,S.selDate))continue;
-      if(slotCapacityFull(S.selDate,h,m,newDrinkCups))continue;
+      if(newDrinkCups>0&&slotCapacityFull(S.selDate,h,m,newDrinkCups))continue;
       const slotSel=new Date(S.selDate);slotSel.setHours(h,m,0,0);
       const slotExisting=(S.slotCounts||{})[`${dateToISO(S.selDate)}_${pad(h)}:${pad(m)}`]||0;
-      const slotMinLead=Math.max(15*60*1000,(slotExisting+newDrinkCups)*3*60*1000);
+      const slotMinLead=newDrinkCups>0?Math.max(15*60*1000,(slotExisting+newDrinkCups)*3*60*1000):15*60*1000;
       if(slotSel-now2>=slotMinLead){ns={h,m};break;}
     }
     let toastMsg=isCongested?`因杯數較多，最快可預訂 ${ns?`${pad(ns.h)}:${pad(ns.m)}`:'明日'}，已自動調整`:newDrinkCups>1?`訂購 ${newDrinkCups} 杯，最早可自取 ${ns?`${pad(ns.h)}:${pad(ns.m)}`:'明日'}，已自動調整`:`選擇時間已截止，已自動調整`;
@@ -652,7 +652,7 @@ function renderSuccess(order){let html=`<h3>訂單明細</h3><div class="osb-row
 function newOrder(){showView('v-order');}
 function gcalDate(dateISO,h,m){const d=new Date(dateISO+'T00:00:00');return`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(h)}${pad(m)}00`;}
 function gcalUrl(title,start,end,details,colorId){let u=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}`;if(colorId)u+=`&colorId=${colorId}`;return u;}
-async function updateSlotCount(order,delta){const nonMilkQty=(order.items||[]).filter(i=>i.special!=='milk').reduce((s,i)=>s+i.qty,0);if(!nonMilkQty||!order.dateISO||!(order.time||'').match(/^\d+:\d+/))return;const key=`${order.dateISO}_${order.time}`;await db.collection('settings').doc('slotCounts').set({[key]:firebase.firestore.FieldValue.increment(delta)},{merge:true});}
+async function updateSlotCount(order,delta){const nonMilkQty=(order.items||[]).filter(i=>!i.special).reduce((s,i)=>s+i.qty,0);if(!nonMilkQty||!order.dateISO||!(order.time||'').match(/^\d+:\d+/))return;const key=`${order.dateISO}_${order.time}`;await db.collection('settings').doc('slotCounts').set({[key]:firebase.firestore.FieldValue.increment(delta)},{merge:true});}
 // ── Admin ──
 function openAdmin(){document.getElementById('pin-overlay').style.display='flex';document.getElementById('pin-input').value='';document.getElementById('pin-error').textContent='';showView('v-admin');setTimeout(()=>document.getElementById('pin-input').focus(),300);}
 function leaveAdmin(){if(_unsubOrders){_unsubOrders();_unsubOrders=null;}showView('v-order');}
