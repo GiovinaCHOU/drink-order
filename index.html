@@ -734,17 +734,20 @@ function confirmDeleteOrder(orderId){
 async function deleteOrder(orderId){
   try{
     const o=S._allOrders.find(x=>x.id===orderId);
-    // Restore stock and slot only if not already cancelled
-    if(o&&(o.status||'')!=='cancelled'){
+    const st=o?(o.status||''):'';
+    if(o&&st!=='cancelled'){
       updateSlotCount(o,-1).catch(()=>{});
-      const iceItems=(o.items||[]).filter(i=>i.special==='icecream');
-      if(iceItems.length){
-        const stockRef=db.collection('settings').doc('icestock');
-        const snap=await stockRef.get();
-        const stock=snap.exists?snap.data():{...ICE_DEFAULT};
-        iceItems.forEach(i=>{stock[i.id]=(stock[i.id]||0)+i.qty;S.iceStock[i.id]=(S.iceStock[i.id]||0)+i.qty;});
-        await stockRef.set(stock);
-        buildMenu();
+      // Only restore ice cream stock if order was never fulfilled
+      if(st!=='done'&&st!=='picked_up'){
+        const iceItems=(o.items||[]).filter(i=>i.special==='icecream');
+        if(iceItems.length){
+          const stockRef=db.collection('settings').doc('icestock');
+          const snap=await stockRef.get();
+          const stock=snap.exists?snap.data():{...ICE_DEFAULT};
+          iceItems.forEach(i=>{stock[i.id]=(stock[i.id]||0)+i.qty;S.iceStock[i.id]=(S.iceStock[i.id]||0)+i.qty;});
+          await stockRef.set(stock);
+          buildMenu();
+        }
       }
     }
     await db.collection('orders').doc(orderId).delete();
