@@ -607,7 +607,7 @@ async function submitOrder(){
   const hasDrinkItems=items.some(i=>!i.special);const hasMilkItems=items.some(i=>i.special==='milk');
   const submitBtn=document.getElementById('submit-btn');submitBtn.disabled=true;submitBtn.textContent='提交中...';
   const{cash,vouchers}=cartTotal();
-  let orderDate,orderTime,isMilkOnly=false;
+  let orderDate='',orderTime='',isMilkOnly=false;
   if(hasDrinkItems&&S.selDate&&S.selTime){orderDate=S.selDate.toLocaleDateString('zh-TW');orderTime=`${pad(S.selTime.h)}:${pad(S.selTime.m)}`;}
   else if(hasMilkItems&&!hasDrinkItems){const fm=items.find(i=>i.special==='milk');orderDate=fm?.milkDate?new Date(fm.milkDate).toLocaleDateString('zh-TW'):'';orderTime='15:00 取貨';isMilkOnly=true;}
   const order={id:makeOrderId(),createdAt:new Date().toISOString(),profile:{name:S.profile.name,dept:S.profile.dept},date:orderDate,time:orderTime,isMilk:isMilkOnly,dateISO:hasDrinkItems&&S.selDate?dateToISO(S.selDate):(items.find(i=>i.special==='milk')?.milkDate?dateToISO(items.find(i=>i.special==='milk').milkDate):dateToISO(new Date())),items:items.map(e=>({id:e.id,name:e.name,qty:e.qty,temp:e.temp,payment:e.payment,special:e.special||null,milkDateLabel:e.milkDateLabel||null,milkDateISO:e.milkDateISO||null})),hasRack:S.hasRack,cash,vouchers};
