@@ -24,13 +24,16 @@ const FIREBASE_CONFIG = {
   --r:12px;--ih:48px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
 body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
   background:var(--bg);color:var(--text);max-width:480px;margin:0 auto;height:100vh;overflow:hidden}
-.view{display:none;flex-direction:column;height:100vh;overflow:hidden}
+.view{display:none;flex-direction:column;height:100vh;overflow:hidden;overscroll-behavior:none}
 .view.active{display:flex}
-.scroll-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:100px}
-.scroll-body::-webkit-scrollbar{display:none}
+.scroll-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:100px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+@media (pointer:coarse){.scroll-body{scrollbar-width:none}}
+.scroll-body::-webkit-scrollbar{width:4px}
+.scroll-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+@media (pointer:coarse){.scroll-body::-webkit-scrollbar{display:none}}
 .app-header{background:linear-gradient(135deg,var(--surf2),var(--bg2));padding:14px 18px;
   border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .app-header h1{font-size:18px;font-weight:700;letter-spacing:2px;flex:1}
@@ -65,7 +68,7 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
 .wheel-col{flex:1;display:flex;flex-direction:column;align-items:center}
 .wheel-col .wt{font-size:11px;color:var(--dim);padding:4px 0 6px;letter-spacing:1px}
 .wheel-outer{position:relative;width:100%}
-.wheel-wrap{height:calc(var(--ih)*5);overflow-y:scroll;width:100%;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.wheel-wrap{height:calc(var(--ih)*5);overflow-y:scroll;width:100%;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior:contain}
 .wheel-wrap::-webkit-scrollbar{display:none}
 .wi{height:var(--ih);display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:18px;font-weight:500;user-select:none;transition:.1s}
 .wi.disabled{opacity:.22;pointer-events:none}
@@ -151,7 +154,7 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
 .tval{font-size:14px;font-weight:600}
 .grand{font-size:18px;font-weight:700;color:var(--gold)}
 .review-warning{margin:0 12px 12px;padding:12px 14px;background:rgba(224,53,53,.1);border:1px solid rgba(224,53,53,.3);border-radius:10px;font-size:13px;color:#ff9090;line-height:1.5}
-.success-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;overflow-y:auto}
+.success-body{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;overflow-y:auto;overscroll-behavior:contain}
 .success-icon{font-size:72px;margin-bottom:16px;animation:pop .4s ease}
 @keyframes pop{0%{transform:scale(0)}80%{transform:scale(1.1)}100%{transform:scale(1)}}
 .success-title{font-size:24px;font-weight:700;color:var(--green);margin-bottom:8px}
