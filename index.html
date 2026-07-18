@@ -363,12 +363,13 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
   <div class="admin-tabs">
     <button class="atab active" onclick="switchAdminTab('orders')">訂單</button>
     <button class="atab" onclick="switchAdminTab('milk')">牛奶叫貨</button>
-    <button class="atab" onclick="switchAdminTab('stock')">冰棒庫存</button>
+    <button class="atab" onclick="switchAdminTab('stock')">商品管理</button>
     <button class="atab" onclick="switchAdminTab('settings')">設定</button>
   </div>
   <div class="scroll-body" style="padding-bottom:24px">
     <div class="apanel active" id="panel-orders">
       <div style="height:8px"></div>
+      <button style="width:100%;padding:9px;margin-bottom:8px;background:rgba(224,53,53,.08);border:1px solid rgba(224,53,53,.25);border-radius:8px;color:var(--red);font-size:13px;cursor:pointer;font-family:inherit" onclick="clearAllOrdersWithPin()">🗑 一鍵清除所有訂單</button>
       <div class="filter-row">
         <div class="fchip active" data-f="all" onclick="filterOrders(this)">全部</div>
         <div class="fchip" data-f="today" onclick="filterOrders(this)">今日</div>
@@ -380,12 +381,7 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
     <div class="apanel" id="panel-milk"><div style="height:8px"></div><div id="milk-admin-content"></div></div>
     <div class="apanel" id="panel-stock">
       <div style="height:8px"></div>
-      <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px">
-        <div style="font-size:14px;font-weight:600;margin-bottom:12px">🍦 各口味庫存</div>
-        <div id="ice-stock-rows"></div>
-      </div>
-      <div id="stock-today-summary" style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px"></div>
-      <button class="asave-btn" onclick="saveIceStock()">儲存庫存</button>
+      <div id="products-admin-content"></div>
     </div>
     <div class="apanel" id="panel-settings">
       <div style="height:8px"></div>
@@ -442,25 +438,7 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
         <textarea id="success-note" rows="4" placeholder="留空則顯示預設文字" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;resize:vertical;font-family:inherit"></textarea>
       </div>
 
-      <div class="srow" style="flex-direction:column;align-items:stretch">
-        <div class="sr-label">🌟 季節限定品項</div>
-        <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 8px">上架後前台自動顯示「季節限定」分頁，行為與一般飲品相同</div>
-        <div id="seasonal-list" style="margin-bottom:10px"></div>
-        <div style="display:flex;flex-direction:column;gap:8px;padding:12px;background:rgba(255,255,255,.04);border-radius:10px;border:1px solid var(--border)">
-          <div style="font-size:13px;color:var(--dim);font-weight:600;margin-bottom:2px">新增品項</div>
-          <input type="text" id="sea-name" placeholder="品項名稱（例：草莓拿鐵）" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;font-family:inherit">
-          <input type="number" id="sea-price" placeholder="售價（台幣，0 = 免費）" min="0" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;font-family:inherit">
-          <div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px 0">
-            <label style="font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="sea-temp" value="both" checked> 冷熱皆可</label>
-            <label style="font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="sea-temp" value="hot"> 熱飲限定</label>
-            <label style="font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="radio" name="sea-temp" value="cold"> 冰飲限定</label>
-          </div>
-          <button onclick="addSeasonalItem()" style="padding:10px;background:rgba(68,170,85,.15);border:1px solid rgba(68,170,85,.4);border-radius:8px;color:var(--green);font-size:14px;cursor:pointer;font-family:inherit">＋ 新增季節限定品項</button>
-        </div>
-      </div>
-
       <button class="asave-btn" onclick="saveSettings()">儲存設定</button>
-      <button style="width:100%;padding:12px;background:rgba(224,53,53,.1);border:1px solid rgba(224,53,53,.3);border-radius:10px;font-size:14px;color:var(--red);cursor:pointer;margin-top:8px" onclick="clearAllOrders()">清除所有訂單紀錄</button>
     </div>
   </div>
 </div>
@@ -479,7 +457,7 @@ const MENU=[
   {id:'bottled',label:'🍼 罐裝牛奶',special:'milk',items:[{id:'milk1',name:'罐裝牛奶',price:0,temp:'cold'}]},
   {id:'icecream',label:'🍦 冰棒',special:'icecream',items:ICE_IDS.map(id=>({id,name:ICE_NAMES[id]+'冰棒',price:0,temp:'cold'}))},
 ];
-let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'17:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:'',seasonalItems:[]},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
+let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'60659117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'17:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:'',seasonalItems:[],itemOverrides:{},customCategories:[]},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
 let db=null,_unsubOrders=null,_unsubStock=null,curFilter='all',activeTab='coffee',_fixedMonth=null;
 
 async function init(){
@@ -564,6 +542,7 @@ function cartUniqueId(){return Date.now().toString(36)+Math.random().toString(36
 
 function addToCart(itemId){
   const item=findItem(itemId);if(!item)return;
+  if(item.paused){showToast('⏸ 此品項暫停售賣');return;}
   const stg=getStaging(itemId,item);
   if(item.special==='milk'){
     if(!S.selMilkDate){showToast('請先選擇取貨日期');return;}
@@ -595,15 +574,44 @@ function cartTotal(){let cash=0,v=0;for(const item of cartItems()){const qty=ite
 function renderCart(){const items=cartItems();const btn=document.getElementById('cart-btn');const txt=document.getElementById('cart-btn-text');const hasDrinkItems=items.some(i=>!i.special);if(hasDrinkItems&&(!S.selDate||!S.selTime)){btn.className='cart-btn disabled';txt.innerHTML='請先選擇飲品取餐時間';return;}if(items.length===0){btn.className='cart-btn disabled';txt.innerHTML='尚未加入品項';return;}const total=items.reduce((s,i)=>s+i.qty,0);const{cash,vouchers}=cartTotal();let p=[];if(cash>0)p.push(`🪙$${cash}`);if(vouchers>0)p.push(`🎫×${vouchers}`);btn.className='cart-btn';txt.innerHTML=`<span class="cart-badge">${total} 件</span> 前往確認 · ${p.join(' + ')}`;}
 
 // ── Menu ──
-function buildMenu(){const tabBar=document.getElementById('tab-bar'),panels=document.getElementById('menu-panels');tabBar.innerHTML='';panels.innerHTML='';const seasonal=S.settings.seasonalItems||[];if(activeTab==='seasonal'&&!seasonal.length)activeTab='coffee';MENU.forEach(cat=>{const tab=document.createElement('button');tab.className='tab-btn'+(cat.id===activeTab?' active':'');tab.textContent=cat.label;tab.onclick=()=>{activeTab=cat.id;document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));tab.classList.add('active');document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+cat.id).classList.add('active');};tabBar.appendChild(tab);const panel=document.createElement('div');panel.className='menu-panel'+(cat.id===activeTab?' active':'');panel.id='panel-'+cat.id;if(cat.special==='milk'){const picker=document.createElement('div');picker.className='milk-picker';picker.innerHTML=`<div class="milk-picker-label">🍼 罐裝牛奶　週一三五 15:00 開放取貨</div><div class="milk-date-chips" id="milk-chips"></div><div id="milk-warn" style="margin-top:6px;font-size:12px;color:var(--gold)"></div>`;panel.appendChild(picker);cat.items.forEach(item=>panel.appendChild(buildMenuCard(item,'milk')));panels.appendChild(panel);buildMilkDateChips();}else{cat.items.forEach(item=>panel.appendChild(buildMenuCard(item,cat.special||null)));panels.appendChild(panel);}});if(seasonal.length>0){const catId='seasonal';const tab=document.createElement('button');tab.className='tab-btn'+(catId===activeTab?' active':'');tab.textContent='🌟 季節限定';tab.onclick=()=>{activeTab=catId;document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));tab.classList.add('active');document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+catId).classList.add('active');};tabBar.appendChild(tab);const panel=document.createElement('div');panel.className='menu-panel'+(catId===activeTab?' active':'');panel.id='panel-'+catId;seasonal.forEach(item=>panel.appendChild(buildMenuCard(item,null)));panels.appendChild(panel);}}
+function buildMenu(){
+  const tabBar=document.getElementById('tab-bar'),panels=document.getElementById('menu-panels');tabBar.innerHTML='';panels.innerHTML='';
+  const ovs=S.settings.itemOverrides||{};
+  const enrich=(item,sp)=>{const ov=ovs[item.id]||{};return{...item,special:sp||null,price:ov.priceOverride!=null?ov.priceOverride:item.price,temp:ov.tempOverride||item.temp,paused:!!ov.paused,note:ov.note||'',noteEnabled:!!ov.noteEnabled};};
+  const addTab=(id,label)=>{const t=document.createElement('button');t.className='tab-btn'+(id===activeTab?' active':'');t.textContent=label;t.onclick=()=>{activeTab=id;document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));t.classList.add('active');document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+id).classList.add('active');};tabBar.appendChild(t);};
+  // Build customCats: customCategories + legacy seasonalItems
+  const customCats=[...(S.settings.customCategories||[])];
+  const legacySea=S.settings.seasonalItems||[];
+  if(legacySea.length>0&&!customCats.find(c=>c.id==='seasonal_legacy'))customCats.push({id:'seasonal_legacy',label:'🌟 季節限定',items:legacySea});
+  const allIds=[...MENU.map(c=>c.id),...customCats.filter(c=>(c.items||[]).length>0).map(c=>c.id)];
+  if(!allIds.includes(activeTab))activeTab='coffee';
+  MENU.forEach(cat=>{
+    addTab(cat.id,cat.label);
+    const panel=document.createElement('div');panel.className='menu-panel'+(cat.id===activeTab?' active':'');panel.id='panel-'+cat.id;
+    if(cat.special==='milk'){const picker=document.createElement('div');picker.className='milk-picker';picker.innerHTML=`<div class="milk-picker-label">🍼 罐裝牛奶　週一三五 15:00 開放取貨</div><div class="milk-date-chips" id="milk-chips"></div><div id="milk-warn" style="margin-top:6px;font-size:12px;color:var(--gold)"></div>`;panel.appendChild(picker);cat.items.forEach(item=>panel.appendChild(buildMenuCard(enrich(item,cat.special),'milk')));panels.appendChild(panel);buildMilkDateChips();}
+    else{cat.items.forEach(item=>panel.appendChild(buildMenuCard(enrich(item,cat.special),cat.special||null)));panels.appendChild(panel);}
+  });
+  customCats.forEach(cat=>{
+    if(!(cat.items&&cat.items.length))return;
+    addTab(cat.id,cat.label);
+    const panel=document.createElement('div');panel.className='menu-panel'+(cat.id===activeTab?' active':'');panel.id='panel-'+cat.id;
+    cat.items.forEach(item=>panel.appendChild(buildMenuCard(enrich(item,null),null)));
+    panels.appendChild(panel);
+  });
+}
 function vb(n){return`<span class="vbadge">🎫×${n}</span>`;}
 function buildMenuCard(item,special){const stg=getStaging(item.id,item);const card=document.createElement('div');card.className='mic';card.id='card-'+item.id;let badgeCls='both';if(item.temp==='hot')badgeCls='hot';else if(item.temp==='cold')badgeCls='cold';let badgeIcon=item.temp==='hot'?'🔥':item.temp==='cold'?'🧊':'☕';if(special==='icecream')badgeIcon=ICE_HEARTS[item.id]||'🍦';let tagCls=badgeCls,tagLbl=item.temp==='hot'?'熱飲限定':item.temp==='cold'?'冰飲限定':'冷熱皆可';let priceHtml='';if(special==='milk')priceHtml=`<div style="text-align:right">${vb(4)}<div style="font-size:11px;color:var(--dim);margin-top:3px">每瓶</div></div>`;else if(special==='icecream'){const s=S.iceStock[item.id]??0;const scls=s===0?'out':s<=3?'low':'ok';priceHtml=`<div style="text-align:right"><div style="font-size:12px;margin-bottom:3px">${vb(1)}<span style="color:var(--dim)">+🪙5 / ${vb(2)}</span></div><span class="sbadge ${scls}">${s===0?'已售完':`剩 ${s}`}</span></div>`;}else{const disc=Math.round(item.price*0.7);priceHtml=`<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:var(--gold)">🪙${disc}<span style="font-size:11px;color:var(--dim);text-decoration:line-through;margin-left:2px">$${item.price}</span></div><div style="margin-top:3px">${vb(1)}</div></div>`;}
 card.innerHTML=`<div class="mic-head"><div class="mic-badge ${badgeCls}">${badgeIcon}</div><div class="mic-info"><div class="mic-name">${item.name}</div><span class="mic-tag ${tagCls}">${tagLbl}</span></div>${priceHtml}</div>`;
 if(item.temp==='both'&&!special){const t=stg.temp||'hot';const row=document.createElement('div');row.className='mic-row';row.innerHTML=`<button class="temp-btn${t==='hot'?' active hot':''}" onclick="setStagingTemp('${item.id}','hot');this.classList.add('active','hot');this.nextElementSibling.classList.remove('active','cold')">🔥 熱飲</button><button class="temp-btn${t==='cold'?' active cold':''}" onclick="setStagingTemp('${item.id}','cold');this.classList.add('active','cold');this.previousElementSibling.classList.remove('active','hot')">🧊 冰飲</button>`;card.appendChild(row);}
 if(!special){const pay=stg.payment||'v1';const disc=Math.round(item.price*0.7);const row=document.createElement('div');row.className='mic-row';row.innerHTML=`<button class="pay-opt${pay==='v1'?' active':''}" onclick="setStagingPay('${item.id}','v1');this.classList.add('active');this.nextElementSibling.classList.remove('active')">${vb(1)} 兌換</button><button class="pay-opt${pay==='cash'?' active':''}" onclick="setStagingPay('${item.id}','cash');this.classList.add('active');this.previousElementSibling.classList.remove('active')">🪙 現金 $${disc}</button>`;card.appendChild(row);}else if(special==='icecream'){const pay=stg.payment||'v1p5';const row=document.createElement('div');row.className='mic-row';row.innerHTML=`<button class="pay-opt${pay==='v1p5'?' active':''}" onclick="setStagingPay('${item.id}','v1p5');this.classList.add('active');this.nextElementSibling.classList.remove('active')">${vb(1)} + 🪙5</button><button class="pay-opt${pay==='v2'?' active':''}" onclick="setStagingPay('${item.id}','v2');this.classList.add('active');this.previousElementSibling.classList.remove('active')">${vb(2)} 兌換</button>`;card.appendChild(row);}
-const soldOut=special==='icecream'&&(S.iceStock[item.id]??0)===0;const addRow=document.createElement('div');addRow.className='mic-row';addRow.innerHTML=`<div class="stg-qty"><button onclick="stagingQtyChange('${item.id}',-1)"${soldOut?' disabled':''}>−</button><div class="sqn" id="stgqty-${item.id}">${stg.qty||1}</div><button onclick="stagingQtyChange('${item.id}',1)"${soldOut?' disabled':''}>+</button></div><button class="add-cart-btn" onclick="addToCart('${item.id}')"${soldOut?' disabled':''}>＋ 加入購物車</button>`;card.appendChild(addRow);
-const statusEl=document.createElement('div');statusEl.className='cart-status';statusEl.id='cstatus-'+item.id;card.appendChild(statusEl);setTimeout(()=>renderCardStatus(item.id),0);return card;}
-function findItem(id){for(const cat of MENU){const it=cat.items.find(i=>i.id===id);if(it)return{...it,special:cat.special||null};}const sea=(S.settings.seasonalItems||[]).find(i=>i.id===id);if(sea)return{...sea,special:null};return null;}
+const soldOut=(special==='icecream'&&(S.iceStock[item.id]??0)===0)||!!item.paused;const addRow=document.createElement('div');addRow.className='mic-row';
+if(item.paused){addRow.innerHTML=`<div style="width:100%;text-align:center;padding:8px 0;color:var(--red);font-size:13px;background:rgba(224,53,53,.06);border-radius:8px">⏸ 暫停售賣中</div>`;}
+else{addRow.innerHTML=`<div class="stg-qty"><button onclick="stagingQtyChange('${item.id}',-1)"${soldOut?' disabled':''}>−</button><div class="sqn" id="stgqty-${item.id}">${stg.qty||1}</div><button onclick="stagingQtyChange('${item.id}',1)"${soldOut?' disabled':''}>+</button></div><button class="add-cart-btn" onclick="addToCart('${item.id}')"${soldOut?' disabled':''}>＋ 加入購物車</button>`;}
+card.appendChild(addRow);
+const statusEl=document.createElement('div');statusEl.className='cart-status';statusEl.id='cstatus-'+item.id;card.appendChild(statusEl);
+if(item.noteEnabled&&item.note){const noteEl=document.createElement('div');noteEl.style.cssText='font-size:11px;color:var(--gold);padding:4px 8px 0;line-height:1.5';noteEl.textContent='📌 '+item.note;card.appendChild(noteEl);}
+setTimeout(()=>renderCardStatus(item.id),0);return card;}
+function findItem(id){const ovs=S.settings.itemOverrides||{};const applyOv=(item,sp)=>{const ov=ovs[item.id]||{};return{...item,special:sp||null,price:ov.priceOverride!=null?ov.priceOverride:item.price,temp:ov.tempOverride||item.temp,paused:!!ov.paused,note:ov.note||'',noteEnabled:!!ov.noteEnabled};};for(const cat of MENU){const it=cat.items.find(i=>i.id===id);if(it)return applyOv(it,cat.special);}for(const cat of(S.settings.customCategories||[])){const it=(cat.items||[]).find(i=>i.id===id);if(it){const ov=ovs[id]||{};return{...it,special:null,paused:!!ov.paused,note:ov.note||'',noteEnabled:!!ov.noteEnabled};}}const sea=(S.settings.seasonalItems||[]).find(i=>i.id===id);if(sea){const ov=ovs[id]||{};return{...sea,special:null,paused:!!ov.paused};}return null;}
 function buildMilkDateChips(){const chipsEl=document.getElementById('milk-chips');const warnEl=document.getElementById('milk-warn');if(!chipsEl)return;const deliveries=getMilkDeliveries();S._milkDeliveries=deliveries;if(!S.selMilkDate&&deliveries.length>0)S.selMilkDate=deliveries[0].deliveryDate;if(!deliveries.length){chipsEl.innerHTML='<div style="color:var(--dim);font-size:13px">暫無可預訂日期</div>';return;}chipsEl.innerHTML=deliveries.map(({deliveryDate,deadline,label},i)=>{const isSel=S.selMilkDate&&deliveryDate.toDateString()===S.selMilkDate.toDateString();return`<div class="mdc${isSel?' active':''}" onclick="pickMilkDate(${i})"><div class="mdc-d">${label}</div><div class="mdc-dl">截止 ${deadline.getMonth()+1}/${deadline.getDate()} ${pad(deadline.getHours())}:00</div></div>`;}).join('');if(warnEl)warnEl.textContent=S.selMilkDate?`已選：${S.selMilkDate.getMonth()+1}/${S.selMilkDate.getDate()} 取貨`:'';}
 function pickMilkDate(i){if(!S._milkDeliveries[i])return;S.selMilkDate=S._milkDeliveries[i].deliveryDate;buildMilkDateChips();}
 
@@ -723,8 +731,8 @@ function openAdmin(){document.getElementById('pin-overlay').style.display='flex'
 function leaveAdmin(){if(_unsubOrders){_unsubOrders();_unsubOrders=null;}showView('v-order');}
 function checkPin(){const e=document.getElementById('pin-input').value;if(e===S.settings.pin){document.getElementById('pin-overlay').style.display='none';loadAdminUI();subscribeOrders();}else{document.getElementById('pin-error').textContent='PIN 碼錯誤';document.getElementById('pin-input').value='';}}
 document.getElementById('pin-input').addEventListener('keydown',e=>{if(e.key==='Enter')checkPin();});
-function loadAdminUI(){document.getElementById('ntfy-topic').value=S.settings.ntfyTopic||'';document.getElementById('bear-url').value=S.settings.bearUrl||'';document.getElementById('success-image-url').value=S.settings.successImageUrl||'';document.getElementById('success-note').value=S.settings.successNote||'';document.getElementById('holiday-note').value=S.settings.holidayNote||'';document.getElementById('order-note').value=S.settings.orderNote||'';renderClosedDatesCalendar();renderSeasonalAdmin();}
-function switchAdminTab(tab){document.querySelectorAll('.atab').forEach((t,i)=>t.classList.toggle('active',['orders','milk','stock','settings'][i]===tab));document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+tab).classList.add('active');if(tab==='stock')renderStockPanel();if(tab==='milk')renderMilkAdmin();}
+function loadAdminUI(){document.getElementById('ntfy-topic').value=S.settings.ntfyTopic||'';document.getElementById('bear-url').value=S.settings.bearUrl||'';document.getElementById('success-image-url').value=S.settings.successImageUrl||'';document.getElementById('success-note').value=S.settings.successNote||'';document.getElementById('holiday-note').value=S.settings.holidayNote||'';document.getElementById('order-note').value=S.settings.orderNote||'';renderClosedDatesCalendar();}
+function switchAdminTab(tab){document.querySelectorAll('.atab').forEach((t,i)=>t.classList.toggle('active',['orders','milk','stock','settings'][i]===tab));document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+tab).classList.add('active');if(tab==='stock')renderProductsPanel();if(tab==='milk')renderMilkAdmin();}
 function filterOrders(chip){document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));chip.classList.add('active');curFilter=chip.dataset.f;renderOrderList(curFilter);}
 function renderOrderList(filter){
   const orders=S._allOrders;const todayStr=new Date().toLocaleDateString('zh-TW');
@@ -738,8 +746,7 @@ function renderOrderList(filter){
     const st=o.status||'pending';
     const isCancelled=st==='cancelled';
     const rk=o.hasRack!=null?`<span style="font-size:12px;color:${o.hasRack?'var(--green)':'var(--dim)'}">${o.hasRack?'✅杯架':'❌無架'}</span>`:'';
-    const statusBadge=st==='done'?'<span class="oc-status done">✅ 已完成</span>'
-      :st==='picked_up'?'<span class="oc-status picked">🛍 已取貨</span>'
+    const statusBadge=(st==='done'||st==='picked_up')?'<span class="oc-status picked">🛍 已取貨</span>'
       :st==='cancelled'?'<span class="oc-status cancelled">✕ 已取消</span>':'';
     const itml=(o.items||[]).map(i=>{let p=i.payment==='cash'?'七折':i.payment==='v1'?'🎫×1':i.payment==='v4'?'🎫×4':i.payment==='v1p5'?'🎫×1+5':'🎫×2';let ml=i.milkDateLabel?` (${i.milkDateLabel})`:'';return`<div class="oc-item-row">· ${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}（${p}）${ml}</div>`;}).join('');
     const calDayLink=(!o.isMilk&&o.dateISO)?`https://calendar.google.com/calendar/r/day/${o.dateISO.split('-').join('/')}`:null;
@@ -755,8 +762,7 @@ function renderOrderList(filter){
   ${statusBadge}${cancelExtra}
 </div>
 <div class="oc-actions">
-  <button class="oc-btn${st==='done'?' done':''}" onclick="updateOrderStatus('${o.id}','done')">✓ 完成</button>
-  <button class="oc-btn${st==='picked_up'?' picked':''}" onclick="updateOrderStatus('${o.id}','picked_up')">☑ 取貨</button>
+  <button class="oc-btn${(st==='done'||st==='picked_up')?' picked':''}" onclick="updateOrderStatus('${o.id}','picked_up')">☑ 取貨</button>
   <button class="oc-btn${st==='cancelled'?' cancel':''}" onclick="updateOrderStatus('${o.id}','cancelled')">✕ 取消</button>
   ${st!=='pending'?`<button class="oc-btn" onclick="updateOrderStatus('${o.id}','pending')">↩ 復原</button>`:''}
   <button class="oc-btn" style="color:var(--red);border-color:rgba(224,53,53,.3)" onclick="confirmDeleteOrder('${o.id}')">🗑 刪除</button>
@@ -786,15 +792,11 @@ async function updateOrderStatus(orderId,newStatus){
         setTimeout(()=>{if(confirm('前往行事曆刪除相關事件？'))window.open(link,'_blank');},400);
       }else showToast('訂單已取消，庫存已更新');
     }else if(newStatus==='pending'){if(o&&(o.status||'')==='cancelled')updateSlotCount(o,1).catch(()=>{});showToast('已復原為待處理');}
-    else showToast(newStatus==='done'?'✅ 已完成':'🛍 已取貨');
+    else if(newStatus==='picked_up'){showToast('🛍 已取貨');setTimeout(()=>{if(confirm('是否一併刪除此訂單記錄？'))deleteOrder(orderId);},300);}
+    else showToast('✅ 已完成');
   }catch(e){showToast('❌ 更新失敗：'+e.message);}
 }
-function confirmDeleteOrder(orderId){
-  const pin=prompt('請輸入管理員 PIN 碼確認刪除');
-  if(pin===null)return;
-  if(pin!==S.settings.pin){showToast('❌ PIN 碼錯誤，取消刪除');return;}
-  deleteOrder(orderId);
-}
+function confirmDeleteOrder(orderId){setTimeout(()=>{if(confirm('確定刪除此訂單？'))deleteOrder(orderId);},300);}
 async function deleteOrder(orderId){
   try{
     const o=S._allOrders.find(x=>x.id===orderId);
@@ -919,11 +921,72 @@ function toggleClosedDate(iso){const dates=S.settings.closedDates||[];S.settings
 function prevCalMonth(){_calM--;if(_calM<0){_calM=11;_calY--;}renderClosedDatesCalendar();}
 function nextCalMonth(){_calM++;if(_calM>11){_calM=0;_calY++;}renderClosedDatesCalendar();}
 
-function renderSeasonalAdmin(){const list=document.getElementById('seasonal-list');if(!list)return;const items=S.settings.seasonalItems||[];if(!items.length){list.innerHTML='<div style="font-size:13px;color:var(--dim);padding:4px 0">尚無季節限定品項</div>';return;}list.innerHTML=items.map(it=>{const tempLabel=it.temp==='hot'?'🔥 熱飲限定':it.temp==='cold'?'🧊 冰飲限定':'☕ 冷熱皆可';const disc=Math.round((it.price||0)*0.7);const priceLabel=(it.price||0)>0?`$${it.price}（七折 $${disc}）`:'免費';return`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--card);border-radius:8px;margin-bottom:6px;border:1px solid var(--border)"><div><div style="font-size:14px;font-weight:600">${it.name}</div><div style="font-size:12px;color:var(--dim);margin-top:2px">${tempLabel}・${priceLabel}</div></div><button onclick="deleteSeasonalItem('${it.id}')" style="padding:6px 10px;background:rgba(224,53,53,.1);border:1px solid rgba(224,53,53,.3);border-radius:8px;color:var(--red);font-size:12px;cursor:pointer;font-family:inherit;flex-shrink:0;margin-left:10px">刪除</button></div>`;}).join('');}
-async function addSeasonalItem(){const name=document.getElementById('sea-name').value.trim();const price=parseInt(document.getElementById('sea-price').value)||0;const temp=document.querySelector('input[name="sea-temp"]:checked')?.value||'both';if(!name){showToast('請輸入品項名稱');return;}const id='sea_'+Date.now();const newItem={id,name,price,temp};const items=[...(S.settings.seasonalItems||[]),newItem];S.settings.seasonalItems=items;try{await db.collection('settings').doc('admin').set({seasonalItems:items},{merge:true});document.getElementById('sea-name').value='';document.getElementById('sea-price').value='';document.querySelector('input[name="sea-temp"][value="both"]').checked=true;renderSeasonalAdmin();buildMenu();showToast('✅ 已新增季節限定品項');}catch(e){showToast('❌ 新增失敗');}}
-async function deleteSeasonalItem(id){const items=(S.settings.seasonalItems||[]).filter(it=>it.id!==id);S.settings.seasonalItems=items;try{await db.collection('settings').doc('admin').set({seasonalItems:items},{merge:true});renderSeasonalAdmin();buildMenu();showToast('🗑 已刪除品項');}catch(e){showToast('❌ 刪除失敗');}}
+function renderProductsPanel(){
+  const el=document.getElementById('products-admin-content');if(!el)return;
+  // Migrate legacy seasonalItems to customCategories
+  const si=S.settings.seasonalItems||[];
+  let cc=S.settings.customCategories||[];
+  if(si.length>0&&!cc.find(c=>c.id==='cat_seasonal')){cc=[{id:'cat_seasonal',label:'🌟 季節限定',items:si},...cc];S.settings.customCategories=cc;S.settings.seasonalItems=[];db.collection('settings').doc('admin').set({customCategories:cc,seasonalItems:[]},{merge:true}).catch(()=>{});buildMenu();}
+  const ovs=S.settings.itemOverrides||{};
+  let html='';
+  // ── MENU base items ──
+  html+=`<div style="font-size:13px;font-weight:700;color:var(--dim);padding:12px 0 6px">── 固定品項管理 ──</div>`;
+  MENU.forEach(cat=>{
+    html+=`<details style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px"><summary style="font-size:13px;font-weight:600;cursor:pointer;user-select:none">${cat.label}</summary><div style="margin-top:10px">`;
+    cat.items.forEach(item=>{
+      const ov=ovs[item.id]||{};const paused=!!ov.paused;
+      const priceOv=ov.priceOverride!=null?ov.priceOverride:item.price;
+      const tempOv=ov.tempOverride||item.temp;
+      const noteEnabled=!!ov.noteEnabled;const note=(ov.note||'').replace(/"/g,'&quot;');
+      html+=`<div style="padding:10px;background:var(--surf2);border-radius:8px;margin-bottom:8px;${paused?'opacity:.65':''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:14px;font-weight:600">${item.name}${paused?` <span style="font-size:11px;color:var(--red);padding:1px 5px;border-radius:4px;border:1px solid rgba(224,53,53,.4)">暫停</span>`:''}</span>
+          <button onclick="toggleItemPaused('${item.id}')" style="padding:4px 10px;border-radius:6px;border:1px solid ${paused?'rgba(68,170,85,.4)':'rgba(224,53,53,.3)'};background:${paused?'rgba(68,170,85,.12)':'rgba(224,53,53,.08)'};color:${paused?'var(--green)':'var(--red)'};font-size:12px;cursor:pointer;font-family:inherit">${paused?'▶ 恢復':'⏸ 暫停'}</button>
+        </div>`;
+      if(!cat.special){
+        html+=`<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;color:var(--dim)">冷熱：</span>${['both','hot','cold'].map(t=>`<button onclick="setItemTempOverride('${item.id}','${t}')" style="padding:3px 8px;border-radius:5px;border:1px solid ${tempOv===t?'rgba(68,136,238,.5)':'var(--border)'};background:${tempOv===t?'rgba(68,136,238,.2)':'transparent'};color:${tempOv===t?'#88bbff':'var(--text)'};font-size:11px;cursor:pointer;font-family:inherit">${t==='hot'?'🔥熱':t==='cold'?'🧊冰':'☕兩者'}</button>`).join('')}</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:12px;flex-wrap:wrap"><span style="color:var(--dim)">定價：</span><input type="number" min="0" value="${priceOv}" style="width:64px;padding:3px 6px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;font-family:inherit;text-align:center" onchange="setItemPriceOverride('${item.id}',+this.value)"><span style="color:var(--dim)">元（七折 ${Math.round(priceOv*0.7)}元）</span>${ov.priceOverride!=null?`<button onclick="resetItemPrice('${item.id}')" style="padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:11px;cursor:pointer;font-family:inherit">重設</button>`:''}</div>`;
+      }
+      html+=`<div style="display:flex;gap:6px;align-items:center;font-size:12px;flex-wrap:wrap"><label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" ${noteEnabled?'checked':''} onchange="setItemNoteEnabled('${item.id}',this.checked)"> 顯示備註</label>${noteEnabled?`<input type="text" value="${note}" placeholder="備註（顯示於前台品項卡）" style="flex:1;min-width:100px;padding:3px 7px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;font-family:inherit" onchange="setItemNote('${item.id}',this.value)">`:''}</div>`;
+      html+=`</div>`;
+    });
+    html+=`</div></details>`;
+  });
+  // ── Ice cream stock ──
+  html+=`<div style="font-size:13px;font-weight:700;color:var(--dim);padding:12px 0 6px">── 冰棒庫存 ──</div>
+  <div style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px"><div id="ice-stock-rows"></div><div id="stock-today-summary" style="margin-top:8px"></div><button class="asave-btn" onclick="saveIceStock()" style="margin-top:8px">儲存庫存</button></div>`;
+  // ── Custom categories ──
+  html+=`<div style="font-size:13px;font-weight:700;color:var(--dim);padding:12px 0 6px">── 自定義分類 ──</div>`;
+  cc.forEach(cat=>{
+    html+=`<div style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><input type="text" value="${cat.label.replace(/"/g,'&quot;')}" style="flex:1;font-size:14px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:2px 4px;font-family:inherit" onchange="renameCustomCategory('${cat.id}',this.value)"><button onclick="deleteCustomCategory('${cat.id}')" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(224,53,53,.3);background:rgba(224,53,53,.08);color:var(--red);font-size:12px;cursor:pointer;font-family:inherit;flex-shrink:0">🗑 刪除分類</button></div>`;
+    (cat.items||[]).forEach(item=>{
+      const ov=ovs[item.id]||{};const paused=!!ov.paused;
+      const disc=Math.round((item.price||0)*0.7);
+      const tIcon=item.temp==='hot'?'🔥':item.temp==='cold'?'🧊':'☕';
+      html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surf2);border-radius:7px;margin-bottom:5px;${paused?'opacity:.6':''}"><div><span style="font-size:13px">${tIcon} ${item.name}</span><span style="font-size:11px;color:var(--dim);margin-left:6px">$${item.price||0}（七折$${disc}）</span>${paused?'<span style="font-size:11px;color:var(--red);margin-left:4px">暫停</span>':''}</div><div style="display:flex;gap:5px"><button onclick="toggleItemPaused('${item.id}')" style="padding:3px 8px;border-radius:5px;border:1px solid ${paused?'rgba(68,170,85,.4)':'rgba(224,53,53,.3)'};background:${paused?'rgba(68,170,85,.12)':'rgba(224,53,53,.08)'};color:${paused?'var(--green)':'var(--red)'};font-size:11px;cursor:pointer;font-family:inherit">${paused?'▶':'⏸'}</button><button onclick="deleteCustomCategoryItem('${cat.id}','${item.id}')" style="padding:3px 8px;border-radius:5px;border:1px solid rgba(224,53,53,.3);background:rgba(224,53,53,.08);color:var(--red);font-size:11px;cursor:pointer;font-family:inherit">🗑</button></div></div>`;
+    });
+    html+=`<div style="padding:10px;background:rgba(255,255,255,.04);border-radius:7px;border:1px solid var(--border);margin-top:6px"><div style="font-size:11px;color:var(--dim);margin-bottom:5px">新增品項到此分類</div><div style="display:flex;gap:5px;flex-wrap:wrap"><input type="text" id="ci-name-${cat.id}" placeholder="品項名稱" style="flex:2;min-width:90px;padding:5px 7px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;font-family:inherit"><input type="number" id="ci-price-${cat.id}" placeholder="售價" min="0" style="flex:1;min-width:55px;max-width:75px;padding:5px 7px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;font-family:inherit"></div><div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap"><label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px"><input type="radio" name="ci-temp-${cat.id}" value="both" checked>☕兩者</label><label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px"><input type="radio" name="ci-temp-${cat.id}" value="hot">🔥熱飲</label><label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px"><input type="radio" name="ci-temp-${cat.id}" value="cold">🧊冰飲</label><button onclick="addCustomCategoryItem('${cat.id}')" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(68,170,85,.4);background:rgba(68,170,85,.12);color:var(--green);font-size:12px;cursor:pointer;font-family:inherit;margin-left:auto">＋ 加入</button></div></div></div>`;
+  });
+  html+=`<div style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:8px">新增自定義分類</div><div style="display:flex;gap:8px"><input type="text" id="new-cat-label" placeholder="分類名稱（例：🌟 季節限定）" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-family:inherit"><button onclick="addCustomCategory()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(68,170,85,.4);background:rgba(68,170,85,.15);color:var(--green);font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0">＋ 新增</button></div></div>`;
+  el.innerHTML=html;
+  renderStockPanel();
+}
+async function saveItemOverrideFields(itemId,fields){const cur=S.settings.itemOverrides||{};cur[itemId]={...(cur[itemId]||{}),...fields};S.settings.itemOverrides={...cur};await db.collection('settings').doc('admin').set({itemOverrides:S.settings.itemOverrides},{merge:true});}
+async function toggleItemPaused(itemId){const paused=!((S.settings.itemOverrides||{})[itemId]||{}).paused;try{await saveItemOverrideFields(itemId,{paused});buildMenu();renderProductsPanel();showToast(paused?'⏸ 已暫停售賣':'▶ 已恢復售賣');}catch(e){showToast('❌ 更新失敗');}}
+async function setItemTempOverride(itemId,temp){try{await saveItemOverrideFields(itemId,{tempOverride:temp});buildMenu();renderProductsPanel();showToast('✅ 冷熱已更新');}catch(e){showToast('❌ 更新失敗');}}
+async function setItemPriceOverride(itemId,price){try{await saveItemOverrideFields(itemId,{priceOverride:price});buildMenu();}catch(e){showToast('❌ 更新失敗');}}
+async function resetItemPrice(itemId){try{await saveItemOverrideFields(itemId,{priceOverride:null});buildMenu();renderProductsPanel();showToast('✅ 已重設定價');}catch(e){showToast('❌ 更新失敗');}}
+async function setItemNoteEnabled(itemId,enabled){try{await saveItemOverrideFields(itemId,{noteEnabled:enabled});buildMenu();renderProductsPanel();}catch(e){showToast('❌ 更新失敗');}}
+async function setItemNote(itemId,note){try{await saveItemOverrideFields(itemId,{note});buildMenu();}catch(e){showToast('❌ 更新失敗');}}
+async function addCustomCategory(){const label=document.getElementById('new-cat-label').value.trim();if(!label){showToast('請輸入分類名稱');return;}const id='cat_'+Date.now();const cc=[...(S.settings.customCategories||[]),{id,label,items:[]}];S.settings.customCategories=cc;try{await db.collection('settings').doc('admin').set({customCategories:cc},{merge:true});renderProductsPanel();buildMenu();showToast('✅ 已新增分類');}catch(e){showToast('❌ 新增失敗');}}
+async function renameCustomCategory(catId,label){const cc=(S.settings.customCategories||[]).map(c=>c.id===catId?{...c,label}:c);S.settings.customCategories=cc;try{await db.collection('settings').doc('admin').set({customCategories:cc},{merge:true});buildMenu();}catch(e){showToast('❌ 更新失敗');}}
+async function deleteCustomCategory(catId){if(!confirm('確定刪除此分類及所有品項？'))return;const cc=(S.settings.customCategories||[]).filter(c=>c.id!==catId);S.settings.customCategories=cc;try{await db.collection('settings').doc('admin').set({customCategories:cc},{merge:true});renderProductsPanel();buildMenu();showToast('🗑 已刪除分類');}catch(e){showToast('❌ 刪除失敗');}}
+async function addCustomCategoryItem(catId){const name=document.getElementById(`ci-name-${catId}`).value.trim();const price=parseInt(document.getElementById(`ci-price-${catId}`).value)||0;const temp=document.querySelector(`input[name="ci-temp-${catId}"]:checked`)?.value||'both';if(!name){showToast('請輸入品項名稱');return;}const id='ci_'+Date.now();const cc=(S.settings.customCategories||[]).map(c=>c.id===catId?{...c,items:[...(c.items||[]),{id,name,price,temp}]}:c);S.settings.customCategories=cc;try{await db.collection('settings').doc('admin').set({customCategories:cc},{merge:true});renderProductsPanel();buildMenu();showToast('✅ 已新增品項');}catch(e){showToast('❌ 新增失敗');}}
+async function deleteCustomCategoryItem(catId,itemId){const cc=(S.settings.customCategories||[]).map(c=>c.id===catId?{...c,items:(c.items||[]).filter(i=>i.id!==itemId)}:c);S.settings.customCategories=cc;try{await db.collection('settings').doc('admin').set({customCategories:cc},{merge:true});renderProductsPanel();buildMenu();showToast('🗑 已刪除品項');}catch(e){showToast('❌ 刪除失敗');}}
 async function saveSettings(){const np=document.getElementById('new-pin').value,np2=document.getElementById('new-pin2').value;if(np){if(np!==np2){showToast('兩次 PIN 碼不一致');return;}if(!/^\d{4,8}$/.test(np)){showToast('PIN 碼需為4-8位數字');return;}S.settings.pin=np;localStorage.setItem('adminPin',np);document.getElementById('new-pin').value='';document.getElementById('new-pin2').value='';}const cfg={ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),successImageUrl:document.getElementById('success-image-url').value.trim(),successNote:document.getElementById('success-note').value,holidayNote:document.getElementById('holiday-note').value,orderNote:document.getElementById('order-note').value,closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};renderNotices();try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
-async function clearAllOrders(){if(!confirm('確定要清除所有訂單？此操作無法復原。'))return;const snap=await db.collection('orders').get();const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));await batch.commit();showToast('已清除');}
+function clearAllOrdersWithPin(){setTimeout(()=>{const pin=prompt('請輸入管理員 PIN 碼確認清除所有訂單');if(pin===null)return;if(pin!==S.settings.pin){showToast('❌ PIN 碼錯誤');return;}clearAllOrders();},300);}
+async function clearAllOrders(){try{const snap=await db.collection('orders').get();const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));await batch.commit();showToast('✅ 所有訂單已清除');}catch(e){showToast('❌ 清除失敗');}}
 async function testNtfy(){const topic=document.getElementById('ntfy-topic').value.trim();const res=document.getElementById('ntfy-test-result');if(!topic){res.style.color='var(--red)';res.textContent='請先填入 Topic 名稱';return;}res.style.color='var(--dim)';res.textContent='傳送中...';try{const r=await fetch(`https://ntfy.sh/${topic}`,{method:'POST',body:'Test - drink order system connected'});if(r.ok){res.style.color='var(--green)';res.textContent='✅ 已送出，請確認手機是否收到';}else{res.style.color='var(--red)';res.textContent=`❌ 失敗（${r.status}）`;}}catch(e){res.style.color='var(--red)';res.textContent='❌ 網路錯誤：'+e.message;}}
 
 let _tt;function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2500);}
