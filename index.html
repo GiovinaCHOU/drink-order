@@ -380,7 +380,7 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
       <div style="height:8px"></div>
       <div class="srow" style="flex-direction:column;align-items:stretch">
         <div class="sr-label">🚫 公休日設定</div>
-        <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 10px">點選日期切換公休（紅色=公休，飲品及冰棒不開放）</div>
+        <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 10px">點選日期切換公休（紅色=公休，飲品不開放）</div>
         <div id="closed-dates-calendar"></div>
       </div>
       <div class="srow" style="flex-direction:column;align-items:stretch">
@@ -445,27 +445,21 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
 </div>
 <script>
 const DAYS_ZH=['日','一','二','三','四','五','六'];
-const ICE_IDS=['ice-peanut','ice-passion','ice-pineapple','ice-mungbean','ice-rebean','ice-milk','ice-taro'];
-const ICE_NAMES={'ice-peanut':'花生','ice-passion':'百香果','ice-pineapple':'鳳梨','ice-mungbean':'綠豆','ice-rebean':'紅豆','ice-milk':'牛奶','ice-taro':'芋頭'};
-const ICE_HEARTS={'ice-peanut':'🤎','ice-passion':'🧡','ice-pineapple':'💛','ice-mungbean':'💚','ice-rebean':'❤️','ice-milk':'🤍','ice-taro':'💜'};
-const ICE_DEFAULT={'ice-peanut':12,'ice-passion':8,'ice-pineapple':10,'ice-mungbean':5,'ice-rebean':5,'ice-milk':5,'ice-taro':5};
 const MENU=[
   {id:'coffee',label:'☕ 咖啡｜拿鐵',items:[{id:'c1',name:'經典美式',price:65,temp:'both'},{id:'c2',name:'經典拿鐵',price:80,temp:'both'},{id:'c3',name:'焦糖拿鐵',price:90,temp:'both'},{id:'c4',name:'蜂蜜拿鐵',price:90,temp:'both'},{id:'c5',name:'卡布奇諾',price:80,temp:'hot'},{id:'c6',name:'焦糖西西里',price:90,temp:'cold'}]},
   {id:'milk-tea',label:'🥛 醇奶｜茶奶',items:[{id:'m1',name:'濃醇鮮奶',price:70,temp:'both'},{id:'m2',name:'紅茶茶奶',price:80,temp:'both'},{id:'m3',name:'焦糖茶奶',price:90,temp:'both'},{id:'m4',name:'伯爵茶奶',price:80,temp:'both'},{id:'m5',name:'蜂蜜茶奶',price:90,temp:'both'}]},
   {id:'tea',label:'🍵 純茶｜果茶',items:[{id:'t1',name:'伯爵茶',price:70,temp:'both'},{id:'t2',name:'蜜桃茶',price:70,temp:'both'},{id:'t3',name:'蘋果茶',price:70,temp:'both'},{id:'t4',name:'薄荷紅茶',price:80,temp:'hot'},{id:'t5',name:'蜂蜜檸檬紅',price:90,temp:'both'}]},
   {id:'decaf',label:'🌿 無咖啡因',items:[{id:'n1',name:'南非國寶茶',price:80,temp:'hot'},{id:'n2',name:'黃金蕎麥茶',price:90,temp:'hot'},{id:'n3',name:'洋甘菊茶',price:80,temp:'hot'},{id:'n4',name:'菊決枸杞茶',price:90,temp:'hot'},{id:'n5',name:'蜂蜜檸檬',price:90,temp:'cold'}]},
   {id:'bottled',label:'🍼 罐裝牛奶',special:'milk',items:[{id:'milk1',name:'罐裝牛奶',price:0,temp:'cold'}]},
-  {id:'icecream',label:'🍦 冰棒',special:'icecream',items:ICE_IDS.map(id=>({id,name:ICE_NAMES[id]+'冰棒',price:0,temp:'cold'}))},
 ];
-let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},iceStock:{...ICE_DEFAULT},hasRack:null,lastOrder:null,settings:{pin:'9117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'15:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:'',milkPickedUp:{},seasonalItems:[],itemOverrides:{},customCategories:[],menuCategoryOrder:[],menuItemOrder:{},menuExtraItems:{},icePromo:false},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
-let db=null,_unsubOrders=null,_unsubStock=null,curFilter='all',activeTab='coffee',_fixedMonth=null;
+let S={profile:null,selDate:null,selTime:null,selMilkDate:null,cart:[],staging:{},hasRack:null,lastOrder:null,settings:{pin:'9117',ntfyTopic:'',bearUrl:'',successImageUrl:'',successNote:'',milkLocation:'',milkPickupTime:'15:00',milkOrdered:{},milkPaid:{},milkBuffer:{},milkSkipDates:[],closedDates:[],holidayNote:'',orderNote:'',milkPickedUp:{},seasonalItems:[],itemOverrides:{},customCategories:[],menuCategoryOrder:[],menuItemOrder:{},menuExtraItems:{}},_allOrders:[],_milkDeliveries:[],slotCounts:{}};
+let db=null,_unsubOrders=null,curFilter='all',activeTab='coffee',_fixedMonth=null;
 async function init(){
 
   try{
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     db=firebase.firestore();
-    await Promise.all([loadSettingsFromDB(),loadStockFromDB()]);
-    subscribeStock();
+    await Promise.all([loadSettingsFromDB()]);
     subscribeSlotCounts();
     subscribeSettings();
     const p=localStorage.getItem('drinkProfile');
@@ -475,9 +469,7 @@ async function init(){
     startTimeWatcher();
   }catch(e){console.error(e);showToast('⚠️ 資料庫連線失敗，請檢查網路');showView('v-profile');}
 }
-async function loadStockFromDB(){const s=await db.collection('settings').doc('icestock').get();if(s.exists)S.iceStock={...ICE_DEFAULT,...s.data()};}
 async function loadSettingsFromDB(){const s=await db.collection('settings').doc('admin').get();if(s.exists){const d=s.data();S.settings={...S.settings,...d};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}}
-function subscribeStock(){if(_unsubStock)_unsubStock();_unsubStock=db.collection('settings').doc('icestock').onSnapshot(s=>{if(s.exists){S.iceStock={...ICE_DEFAULT,...s.data()};buildMenu();}});}
 function subscribeOrders(){if(_unsubOrders)_unsubOrders();_unsubOrders=db.collection('orders').orderBy('createdAt','desc').limit(300).onSnapshot(s=>{S._allOrders=s.docs.map(d=>d.data());renderOrderList(curFilter);});}
 let _unsubSlots=null,_unsubSettings=null;
 function subscribeSettings(){if(_unsubSettings)_unsubSettings();_unsubSettings=db.collection('settings').doc('admin').onSnapshot(s=>{if(s.exists){const d=s.data();S.settings={...S.settings,...d};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}renderNotices();buildMilkDateChips();},e=>console.warn('settings sync error:',e));}
@@ -529,7 +521,7 @@ function confirmTimeWheel(){const h=getWV('wh-hour'),m=getWV('wh-min');if(isBloc
 // ── Milk dates ──
 function getMilkDeliveries({includeSkipped=false}={}){const now=new Date(),res=[];const skip=S.settings.milkSkipDates||[];for(let i=0;i<=45;i++){const d=new Date(now);d.setDate(d.getDate()+i);d.setHours(0,0,0,0);const dow=d.getDay();const isJulyOrLater=d.getFullYear()>2026||(d.getFullYear()===2026&&d.getMonth()>=6);const validDow=isJulyOrLater?(dow===1||dow===4):(dow===1||dow===2||dow===5);if(validDow){const dl=new Date(d);dl.setDate(d.getDate()-(dow===1?3:1));dl.setHours(17,0,0,0);const iso=dateToISO(d);const isSkipped=skip.includes(iso);if(now<=dl){if(!isSkipped||includeSkipped)res.push({deliveryDate:new Date(d),deadline:dl,label:`${d.getMonth()+1}/${d.getDate()} 週${DAYS_ZH[dow]}`,isSkipped});}}}return res.slice(0,8);}
 // ── Cart ──
-function getStaging(itemId,item){if(!S.staging[itemId]){const defTemp=item.temp==='cold'?'cold':'hot';const defPay=item.special==='icecream'?'v1p5':'v1';S.staging[itemId]={temp:defTemp,payment:defPay,qty:1};}return S.staging[itemId];}
+function getStaging(itemId,item){if(!S.staging[itemId]){const defTemp=item.temp==='cold'?'cold':'hot';const defPay='v1';S.staging[itemId]={temp:defTemp,payment:defPay,qty:1};}return S.staging[itemId];}
 function setStagingTemp(itemId,temp){S.staging[itemId]=S.staging[itemId]||{qty:1,payment:'v1'};S.staging[itemId].temp=temp;renderCardStatus(itemId);}
 function setStagingPay(itemId,pay){S.staging[itemId]=S.staging[itemId]||{qty:1,temp:'hot'};S.staging[itemId].payment=pay;renderCardStatus(itemId);}
 function stagingQtyChange(itemId,delta){const item=findItem(itemId);const stg=getStaging(itemId,item);stg.qty=Math.max(1,stg.qty+delta);const el=document.getElementById('stgqty-'+itemId);if(el)el.textContent=stg.qty;}
@@ -544,13 +536,6 @@ function addToCart(itemId){
     const existing=S.cart.find(e=>e.id===itemId&&e.milkDateISO===milkISO);
     if(existing)existing.qty+=stg.qty;
     else S.cart.push({cartId:cartUniqueId(),id:itemId,name:item.name,temp:'cold',qty:stg.qty,payment:'v4',special:'milk',milkDate:S.selMilkDate,milkDateISO:milkISO,milkDateLabel:`${S.selMilkDate.getMonth()+1}/${S.selMilkDate.getDate()} 週${DAYS_ZH[S.selMilkDate.getDay()]} ${S.settings.milkPickupTime||'15:00'} 取貨`});
-  }else if(item.special==='icecream'){
-    const inCart=S.cart.filter(e=>e.id===itemId).reduce((s,e)=>s+e.qty,0);
-    const avail=(S.iceStock[itemId]??0)-inCart;
-    if(avail<stg.qty){showToast(`${ICE_NAMES[itemId]}庫存不足`);return;}
-    const existing=S.cart.find(e=>e.id===itemId&&e.payment===stg.payment);
-    if(existing)existing.qty+=stg.qty;
-    else S.cart.push({cartId:cartUniqueId(),id:itemId,name:item.name,temp:'cold',qty:stg.qty,payment:stg.payment,special:'icecream'});
   }else{
     const t=item.temp==='hot'?'hot':item.temp==='cold'?'cold':(stg.temp||'hot');
     const pay=stg.payment||'v1';
@@ -564,8 +549,8 @@ function addToCart(itemId){
 function renderCardStatus(itemId){const el=document.getElementById('cstatus-'+itemId);if(!el)return;const inCart=S.cart.filter(e=>e.id===itemId);const total=inCart.reduce((s,e)=>s+e.qty,0);if(total===0){el.textContent='';return;}const byK={};inCart.forEach(e=>{const k=e.special?`${e.payment}`:`${e.temp==='hot'?'熱':'冰'} ${e.payment==='v1'?'(券)':'(現金)'}`;byK[k]=(byK[k]||0)+e.qty;});el.innerHTML=`<span class="in-cart">🛒 購物車：${Object.entries(byK).map(([k,v])=>`${k}×${v}`).join('、')}</span>`;}
 function cartItems(){return S.cart.filter(e=>e.qty>0);}
 function drinkCount(){return cartItems().filter(i=>!i.special).reduce((s,i)=>s+i.qty,0);}
-function cartTotal(){let cash=0,v=0,iceP=0;const promo=S.settings.icePromo;for(const item of cartItems()){const qty=item.qty;if(item.special==='milk')v+=4*qty;else if(item.special==='icecream'){if(promo){iceP+=qty;}else if(item.payment==='v1p5'){v+=qty;cash+=5*qty;}else v+=2*qty;}else{if(item.payment==='v1')v+=(item.voucherOverride??1)*qty;else cash+=Math.round(item.price*0.7)*qty;}}if(iceP>0)v+=Math.ceil(iceP/2);return{cash,vouchers:v};}
-function renderCart(){const items=cartItems();const btn=document.getElementById('cart-btn');const txt=document.getElementById('cart-btn-text');const hasDrinkItems=items.some(i=>!i.special||i.special==='icecream');if(hasDrinkItems&&(!S.selDate||!S.selTime)){btn.className='cart-btn disabled';txt.innerHTML='請先選擇飲品取餐時間';return;}if(items.length===0){btn.className='cart-btn disabled';txt.innerHTML='尚未加入品項';return;}const total=items.reduce((s,i)=>s+i.qty,0);const{cash,vouchers}=cartTotal();let p=[];if(cash>0)p.push(`🪙$${cash}`);if(vouchers>0)p.push(`🎫×${vouchers}`);btn.className='cart-btn';txt.innerHTML=`<span class="cart-badge">${total} 件</span> 前往確認 · ${p.join(' + ')}`;}
+function cartTotal(){let cash=0,v=0;for(const item of cartItems()){const qty=item.qty;if(item.special==='milk')v+=4*qty;else{if(item.payment==='v1')v+=(item.voucherOverride??1)*qty;else cash+=Math.round(item.price*0.7)*qty;}}return{cash,vouchers:v};}
+function renderCart(){const items=cartItems();const btn=document.getElementById('cart-btn');const txt=document.getElementById('cart-btn-text');const hasDrinkItems=items.some(i=>!i.special);if(hasDrinkItems&&(!S.selDate||!S.selTime)){btn.className='cart-btn disabled';txt.innerHTML='請先選擇飲品取餐時間';return;}if(items.length===0){btn.className='cart-btn disabled';txt.innerHTML='尚未加入品項';return;}const total=items.reduce((s,i)=>s+i.qty,0);const{cash,vouchers}=cartTotal();let p=[];if(cash>0)p.push(`🪙$${cash}`);if(vouchers>0)p.push(`🎫×${vouchers}`);btn.className='cart-btn';txt.innerHTML=`<span class="cart-badge">${total} 件</span> 前往確認 · ${p.join(' + ')}`;}
 // ── Menu ──
 function buildMenu(){
   const tabBar=document.getElementById('tab-bar'),panels=document.getElementById('menu-panels');tabBar.innerHTML='';panels.innerHTML='';
@@ -590,12 +575,11 @@ function buildMenu(){
   });
 }
 function vb(n){return`<span class="vbadge">🎫×${n}</span>`;}
-function icePay(btn,itemId,pay){btn.closest('.mic-row').querySelectorAll('.pay-opt').forEach(b=>b.classList.remove('active'));btn.classList.add('active');setStagingPay(itemId,pay);}
-function buildMenuCard(item,special){const stg=getStaging(item.id,item);const card=document.createElement('div');card.className='mic';card.id='card-'+item.id;let badgeCls='both';if(item.temp==='hot')badgeCls='hot';else if(item.temp==='cold')badgeCls='cold';let badgeIcon=item.temp==='hot'?'🔥':item.temp==='cold'?'🧊':'☕';if(special==='icecream')badgeIcon=ICE_HEARTS[item.id]||'🍦';let tagCls=badgeCls,tagLbl=item.temp==='hot'?'熱飲限定':item.temp==='cold'?'冰飲限定':'冷熱皆可';let priceHtml='';if(special==='milk')priceHtml=`<div style="text-align:right">${vb(4)}<div style="font-size:11px;color:var(--dim);margin-top:3px">每瓶</div></div>`;else if(special==='icecream'){const s=S.iceStock[item.id]??0;const scls=s===0?'out':s<=3?'low':'ok';const icePromo=S.settings.icePromo;priceHtml=`<div style="text-align:right"><div style="font-size:12px;margin-bottom:3px">${icePromo?`${vb(1)}<span style="color:var(--gold)">換2支🎉</span>`:`${vb(1)}<span style="color:var(--dim)">+🪙5 / ${vb(2)}</span>`}</div><span class="sbadge ${scls}">${s===0?'已售完':`剩 ${s}`}</span></div>`;}else{const disc=Math.round(item.price*0.7);priceHtml=`<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:var(--gold)">🪙${disc}<span style="font-size:11px;color:var(--dim);text-decoration:line-through;margin-left:2px">$${item.price}</span></div><div style="margin-top:3px">${vb(item.voucherOverride??1)}</div></div>`;}
+function buildMenuCard(item,special){const stg=getStaging(item.id,item);const card=document.createElement('div');card.className='mic';card.id='card-'+item.id;let badgeCls='both';if(item.temp==='hot')badgeCls='hot';else if(item.temp==='cold')badgeCls='cold';let badgeIcon=item.temp==='hot'?'🔥':item.temp==='cold'?'🧊':'☕';let tagCls=badgeCls,tagLbl=item.temp==='hot'?'熱飲限定':item.temp==='cold'?'冰飲限定':'冷熱皆可';let priceHtml='';if(special==='milk')priceHtml=`<div style="text-align:right">${vb(4)}<div style="font-size:11px;color:var(--dim);margin-top:3px">每瓶</div></div>`;else{const disc=Math.round(item.price*0.7);priceHtml=`<div style="text-align:right"><div style="font-size:15px;font-weight:700;color:var(--gold)">🪙${disc}<span style="font-size:11px;color:var(--dim);text-decoration:line-through;margin-left:2px">$${item.price}</span></div><div style="margin-top:3px">${vb(item.voucherOverride??1)}</div></div>`;}
 card.innerHTML=`<div class="mic-head"><div class="mic-badge ${badgeCls}">${badgeIcon}</div><div class="mic-info"><div class="mic-name">${item.name}</div><span class="mic-tag ${tagCls}">${tagLbl}</span></div>${priceHtml}</div>`;
 if(item.temp==='both'&&!special){const t=stg.temp||'hot';const row=document.createElement('div');row.className='mic-row';row.innerHTML=`<button class="temp-btn${t==='hot'?' active hot':''}" onclick="setStagingTemp('${item.id}','hot');this.classList.add('active','hot');this.nextElementSibling.classList.remove('active','cold')">🔥 熱飲</button><button class="temp-btn${t==='cold'?' active cold':''}" onclick="setStagingTemp('${item.id}','cold');this.classList.add('active','cold');this.previousElementSibling.classList.remove('active','hot')">🧊 冰飲</button>`;card.appendChild(row);}
-if(!special){const pay=stg.payment||'v1';const disc=Math.round(item.price*0.7);const row=document.createElement('div');row.className='mic-row';row.innerHTML=`<button class="pay-opt${pay==='v1'?' active':''}" onclick="setStagingPay('${item.id}','v1');this.classList.add('active');this.nextElementSibling.classList.remove('active')">${vb(item.voucherOverride??1)} 兌換</button><button class="pay-opt${pay==='cash'?' active':''}" onclick="setStagingPay('${item.id}','cash');this.classList.add('active');this.previousElementSibling.classList.remove('active')">🪙 現金 $${disc}</button>`;card.appendChild(row);}else if(special==='icecream'){const promo=S.settings.icePromo;if(promo){stg.payment='v1p2';}else if(stg.payment==='v1p2'){stg.payment='v1p5';}const pay=stg.payment||'v1p5';const row=document.createElement('div');row.className='mic-row';let btns;if(promo){btns=`<button class="pay-opt active" data-pay="v1p2" onclick="icePay(this,'${item.id}','v1p2')">${vb(1)}/2支 🎉</button>`;}else{btns=`<button class="pay-opt${pay==='v1p5'?' active':''}" data-pay="v1p5" onclick="icePay(this,'${item.id}','v1p5')">${vb(1)}+🪙5</button><button class="pay-opt${pay==='v2'?' active':''}" data-pay="v2" onclick="icePay(this,'${item.id}','v2')">${vb(2)}</button>`;}row.innerHTML=btns;card.appendChild(row);}
-const soldOut=(special==='icecream'&&(S.iceStock[item.id]??0)===0)||!!item.paused;const addRow=document.createElement('div');addRow.className='mic-row';
+if(!special){const pay=stg.payment||'v1';const disc=Math.round(item.price*0.7);const row=document.createElement('div');row.className='mic-row';row.innerHTML=`<button class="pay-opt${pay==='v1'?' active':''}" onclick="setStagingPay('${item.id}','v1');this.classList.add('active');this.nextElementSibling.classList.remove('active')">${vb(item.voucherOverride??1)} 兌換</button><button class="pay-opt${pay==='cash'?' active':''}" onclick="setStagingPay('${item.id}','cash');this.classList.add('active');this.previousElementSibling.classList.remove('active')">🪙 現金 $${disc}</button>`;card.appendChild(row);}
+const soldOut=!!item.paused;const addRow=document.createElement('div');addRow.className='mic-row';
 if(item.paused){addRow.innerHTML=`<div style="width:100%;text-align:center;padding:8px 0;color:var(--red);font-size:13px;background:rgba(224,53,53,.06);border-radius:8px">⏸ 暫停售賣中</div>`;}
 else{addRow.innerHTML=`<div class="stg-qty"><button onclick="stagingQtyChange('${item.id}',-1)"${soldOut?' disabled':''}>−</button><div class="sqn" id="stgqty-${item.id}">${stg.qty||1}</div><button onclick="stagingQtyChange('${item.id}',1)"${soldOut?' disabled':''}>+</button></div><button class="add-cart-btn" onclick="addToCart('${item.id}')"${soldOut?' disabled':''}>＋ 加入購物車</button>`;}
 card.appendChild(addRow);
@@ -616,8 +600,7 @@ function findItem(id){
 function buildMilkDateChips(){const chipsEl=document.getElementById('milk-chips');const warnEl=document.getElementById('milk-warn');if(!chipsEl)return;const deliveries=getMilkDeliveries();S._milkDeliveries=deliveries;if(!S.selMilkDate&&deliveries.length>0)S.selMilkDate=deliveries[0].deliveryDate;if(!deliveries.length){chipsEl.innerHTML='<div style="color:var(--dim);font-size:13px">暫無可預訂日期</div>';return;}chipsEl.innerHTML=deliveries.map(({deliveryDate,deadline,label},i)=>{const isSel=S.selMilkDate&&deliveryDate.toDateString()===S.selMilkDate.toDateString();return`<div class="mdc${isSel?' active':''}" onclick="pickMilkDate(${i})"><div class="mdc-d">${label}</div><div class="mdc-dl">截止 ${deadline.getMonth()+1}/${deadline.getDate()} ${pad(deadline.getHours())}:00</div></div>`;}).join('');if(warnEl)warnEl.textContent=S.selMilkDate?`已選：${S.selMilkDate.getMonth()+1}/${S.selMilkDate.getDate()} ${S.settings.milkPickupTime||'15:00'} 取貨`:'';}
 function pickMilkDate(i){if(!S._milkDeliveries[i])return;S.selMilkDate=S._milkDeliveries[i].deliveryDate;buildMilkDateChips();}
 // ── Review ──
-function goReview(){const items=cartItems();if(!items.length){showToast('請先加入品項');return;}if(!S.profile){showToast('請先填寫個人資料');showView('v-profile');return;}const hasDrinkItems=items.some(i=>!i.special||i.special==='icecream');if(hasDrinkItems&&(!S.selDate||!S.selTime)){showToast('請先選擇飲品取餐時間');return;}if(items.some(i=>i.special!=='milk')&&S.selDate&&isDateClosed(S.selDate)){showToast('該日為公休日，不開放飲品及冰棒訂購（罐裝牛奶仍可選其他日期預購）');return;}
-if(S.settings.icePromo){const iceQty=items.filter(i=>i.special==='icecream').reduce((s,i)=>s+i.qty,0);if(iceQty>0&&iceQty%2!==0){showToast(`🎉 促銷活動：冰棒需偶數支（目前 ${iceQty} 支），請再加 1 支！`);return;}}
+function goReview(){const items=cartItems();if(!items.length){showToast('請先加入品項');return;}if(!S.profile){showToast('請先填寫個人資料');showView('v-profile');return;}const hasDrinkItems=items.some(i=>!i.special);if(hasDrinkItems&&(!S.selDate||!S.selTime)){showToast('請先選擇飲品取餐時間');return;}if(items.some(i=>i.special!=='milk')&&S.selDate&&isDateClosed(S.selDate)){showToast('該日為公休日，不開放飲品訂購（罐裝牛奶仍可選其他日期預購）');return;}
 if(hasDrinkItems&&S.selDate&&S.selTime){
   const newDrinkCups=items.filter(i=>!i.special).reduce((s,i)=>s+i.qty,0);
   const key=`${dateToISO(S.selDate)}_${pad(S.selTime.h)}:${pad(S.selTime.m)}`;
@@ -647,16 +630,14 @@ if(hasDrinkItems&&S.selDate&&S.selTime){
 const dc=drinkCount();if(dc>=3){document.getElementById('rack-count').textContent=dc;const be=document.getElementById('bear-display');if(S.settings.bearUrl)be.innerHTML=`<img src="${S.settings.bearUrl}" style="width:80px;height:80px;object-fit:contain;border-radius:12px">`;else be.textContent='🐻‍❄️';document.getElementById('rack-modal').classList.add('open');}else{S.hasRack=null;renderReview();showView('v-review');}}
 function setRack(has){S.hasRack=has;document.getElementById('rack-modal').classList.remove('open');if(has)showToast('🐻‍❄️ 謝謝你的環保行動！');renderReview();showView('v-review');}
 function renderReview(){const{name,dept}=S.profile;const items=cartItems();const hasDrinkItems=items.some(i=>!i.special);const hasMilkItems=items.some(i=>i.special==='milk');let infoHtml=`<h3>訂餐資訊</h3><div class="osb-row"><span class="osb-key">姓名</span><span>${name}</span></div><div class="osb-row"><span class="osb-key">部門</span><span>${dept}</span></div>`;if(hasDrinkItems&&S.selDate&&S.selTime)infoHtml+=`<div class="osb-row"><span class="osb-key">飲品取餐</span><span>${S.selDate.getMonth()+1}/${S.selDate.getDate()} (週${DAYS_ZH[S.selDate.getDay()]}) ${pad(S.selTime.h)}:${pad(S.selTime.m)}</span></div>`;if(hasMilkItems)infoHtml+=`<div class="osb-row"><span class="osb-key">牛奶取貨</span><span>${S.settings.milkPickupTime||'15:00'} 開放取貨</span></div>`;if(S.hasRack!=null)infoHtml+=`<div class="osb-row"><span class="osb-key">杯架</span><span>${S.hasRack?'✅ 有帶':'❌ 沒有'}</span></div>`;document.getElementById('review-info').innerHTML=infoHtml;
-const listEl=document.getElementById('review-list');listEl.innerHTML='';items.forEach(entry=>{const item=findItem(entry.id);if(!item)return;const row=document.createElement('div');row.className='review-row';row.id='rrow-'+entry.cartId;const tl=entry.special==='icecream'?'(冰)':entry.temp==='hot'?'(熱)':entry.temp==='cold'?'(冰)':'';let payL='';if(entry.special==='milk')payL=`🎫×4/瓶（${entry.milkDateLabel||''}）`;else if(entry.special==='icecream'){if(S.settings.icePromo){payL='🎉 促銷 1券/2支';}else{payL=entry.payment==='v1p5'?'🎫×1+🪙5':'🎫×2';}}else{const vn=entry.voucherOverride??1;payL=entry.payment==='v1'?`🎫×${vn}`:`🪙${Math.round(item.price*0.7)}`;}let priceOut='';if(entry.special==='milk')priceOut=`🎫×${4*entry.qty}`;else if(entry.special==='icecream'){if(S.settings.icePromo){priceOut='—';}else{priceOut=entry.payment==='v1p5'?`🎫×${entry.qty}+🪙${5*entry.qty}`:`🎫×${2*entry.qty}`;}}else{const vn=entry.voucherOverride??1;priceOut=entry.payment==='v1'?`🎫×${vn*entry.qty}`:`🪙${Math.round(item.price*0.7)*entry.qty}`;}row.innerHTML=`<div class="rr-info"><div class="rr-name">${entry.name} ${tl}</div><div class="rr-meta">${payL}</div></div><div class="rqc"><button class="rqb" onclick="reviewQty('${entry.cartId}',-1)">−</button><div class="rqn" id="rqty-${entry.cartId}">${entry.qty}</div><button class="rqb" onclick="reviewQty('${entry.cartId}',1)">+</button></div><div class="rr-price" id="rprice-${entry.cartId}">${priceOut}</div>`;listEl.appendChild(row);});renderReviewTotal();}
-function reviewQty(cartId,delta){const idx=S.cart.findIndex(e=>e.cartId===cartId);if(idx<0)return;const entry=S.cart[idx];const newQty=Math.max(0,(entry.qty||0)+delta);if(newQty===0){S.cart.splice(idx,1);const row=document.getElementById('rrow-'+cartId);if(row)row.remove();}else{entry.qty=newQty;const qEl=document.getElementById('rqty-'+cartId);if(qEl)qEl.textContent=newQty;const pEl=document.getElementById('rprice-'+cartId);if(pEl){const item=findItem(entry.id);let priceOut='';if(entry.special==='milk')priceOut=`🎫×${4*newQty}`;else if(entry.special==='icecream'){if(S.settings.icePromo){priceOut='—';}else{priceOut=entry.payment==='v1p5'?`🎫×${newQty}+🪙${5*newQty}`:`🎫×${2*newQty}`;}}
-else{const vn=entry.voucherOverride??1;priceOut=entry.payment==='v1'?`🎫×${vn*newQty}`:`🪙${Math.round(item.price*0.7)*newQty}`;}pEl.textContent=priceOut;}}renderReviewTotal();renderCart();renderCardStatus(entry.id);if(!cartItems().length){showView('v-order');showToast('購物車已清空');}}
+const listEl=document.getElementById('review-list');listEl.innerHTML='';items.forEach(entry=>{const item=findItem(entry.id);if(!item)return;const row=document.createElement('div');row.className='review-row';row.id='rrow-'+entry.cartId;const tl=entry.temp==='hot'?'(熱)':entry.temp==='cold'?'(冰)':'';let payL='';if(entry.special==='milk')payL=`🎫×4/瓶（${entry.milkDateLabel||''}）`;else{const vn=entry.voucherOverride??1;payL=entry.payment==='v1'?`🎫×${vn}`:`🪙${Math.round(item.price*0.7)}`;}let priceOut='';if(entry.special==='milk')priceOut=`🎫×${4*entry.qty}`;else{const vn=entry.voucherOverride??1;priceOut=entry.payment==='v1'?`🎫×${vn*entry.qty}`:`🪙${Math.round(item.price*0.7)*entry.qty}`;}row.innerHTML=`<div class="rr-info"><div class="rr-name">${entry.name} ${tl}</div><div class="rr-meta">${payL}</div></div><div class="rqc"><button class="rqb" onclick="reviewQty('${entry.cartId}',-1)">−</button><div class="rqn" id="rqty-${entry.cartId}">${entry.qty}</div><button class="rqb" onclick="reviewQty('${entry.cartId}',1)">+</button></div><div class="rr-price" id="rprice-${entry.cartId}">${priceOut}</div>`;listEl.appendChild(row);});renderReviewTotal();}
+function reviewQty(cartId,delta){const idx=S.cart.findIndex(e=>e.cartId===cartId);if(idx<0)return;const entry=S.cart[idx];const newQty=Math.max(0,(entry.qty||0)+delta);if(newQty===0){S.cart.splice(idx,1);const row=document.getElementById('rrow-'+cartId);if(row)row.remove();}else{entry.qty=newQty;const qEl=document.getElementById('rqty-'+cartId);if(qEl)qEl.textContent=newQty;const pEl=document.getElementById('rprice-'+cartId);if(pEl){const item=findItem(entry.id);let priceOut='';if(entry.special==='milk')priceOut=`🎫×${4*newQty}`;else{const vn=entry.voucherOverride??1;priceOut=entry.payment==='v1'?`🎫×${vn*newQty}`:`🪙${Math.round(item.price*0.7)*newQty}`;}pEl.textContent=priceOut;}}renderReviewTotal();renderCart();renderCardStatus(entry.id);if(!cartItems().length){showView('v-order');showToast('購物車已清空');}}
 function renderReviewTotal(){const{cash,vouchers}=cartTotal();const total=cartItems().reduce((s,i)=>s+i.qty,0);let html=`<div class="trow"><span class="tlabel">品項合計</span><span class="tval">${total} 件</span></div>`;if(cash>0)html+=`<div class="trow"><span class="tlabel">應付現金</span><span class="grand">🪙 $${cash}</span></div>`;if(vouchers>0)html+=`<div class="trow"><span class="tlabel">兌換券合計</span><span class="grand">${vb(vouchers)}</span></div>`;document.getElementById('review-total').innerHTML=html;}
 // ── Submit ──
 function makeOrderId(){const n=new Date();return`ORD-${n.getFullYear()}${pad(n.getMonth()+1)}${pad(n.getDate())}${pad(n.getHours())}${pad(n.getMinutes())}${pad(n.getSeconds())}`;}
 async function submitOrder(){
   const items=cartItems();if(!items.length)return;
-  if(S.settings.icePromo){const iceQty=items.filter(i=>i.special==='icecream').reduce((s,i)=>s+i.qty,0);if(iceQty>0&&iceQty%2!==0){showToast(`🎉 促銷活動：冰棒需偶數支（目前 ${iceQty} 支），請再加 1 支！`);return;}}
-  const hasDrinkItems=items.some(i=>!i.special||i.special==='icecream');const hasMilkItems=items.some(i=>i.special==='milk');
+  const hasDrinkItems=items.some(i=>!i.special);const hasMilkItems=items.some(i=>i.special==='milk');
   const submitBtn=document.getElementById('submit-btn');submitBtn.disabled=true;submitBtn.textContent='提交中...';
   const{cash,vouchers}=cartTotal();
   let orderDate='',orderTime='',isMilkOnly=false;
@@ -664,16 +645,14 @@ async function submitOrder(){
   else if(hasMilkItems&&!hasDrinkItems){const fm=items.find(i=>i.special==='milk');orderDate=fm?.milkDate?new Date(fm.milkDate).toLocaleDateString('zh-TW'):'';orderTime='15:00 取貨';isMilkOnly=true;}
   const order={id:makeOrderId(),createdAt:new Date().toISOString(),profile:{name:S.profile.name,dept:S.profile.dept},date:orderDate,time:orderTime,isMilk:isMilkOnly,dateISO:hasDrinkItems&&S.selDate?dateToISO(S.selDate):(items.find(i=>i.special==='milk')?.milkDate?dateToISO(items.find(i=>i.special==='milk').milkDate):dateToISO(new Date())),items:items.map(e=>({id:e.id,name:e.name,qty:e.qty,temp:e.temp,payment:e.payment,special:e.special||null,milkDateLabel:e.milkDateLabel||null,milkDateISO:e.milkDateISO||null})),hasRack:S.hasRack,cash,vouchers};
   try{
-    const iceItems=items.filter(i=>i.special==='icecream');
-    if(iceItems.length){await db.runTransaction(async tx=>{const stockRef=db.collection('settings').doc('icestock');const snap=await tx.get(stockRef);const stock=snap.exists?snap.data():{...ICE_DEFAULT};for(const item of iceItems){if((stock[item.id]||0)<item.qty)throw new Error(`${ICE_NAMES[item.id]}庫存不足，請返回調整`);}iceItems.forEach(item=>{stock[item.id]=(stock[item.id]||0)-item.qty;});tx.set(stockRef,stock);tx.set(db.collection('orders').doc(order.id),order);});}
-    else await db.collection('orders').doc(order.id).set(order);
+    await db.collection('orders').doc(order.id).set(order);
     updateSlotCount(order,1).catch(e=>console.error('slotCount +1 failed:',e));
     S.lastOrder=order;
     if(S.settings.ntfyTopic){
       const itemStr=items.map(i=>{const t=i.special?'':(i.temp==='hot'?'(熱)':'(冰)');return`${i.name}${t}×${i.qty}`;}).join(' ');
       let msg=`${order.profile.name}｜${order.date} ${order.time}｜${itemStr}｜v:${vouchers} cash:$${cash}`;
       const calLines=[];
-      // 飲品/冰棒事件：開始=取餐時間-杯數×5分鐘，結束=取餐時間
+      // 飲品事件：開始=取餐時間-杯數×5分鐘，結束=取餐時間
       const nonMilkItems=items.filter(i=>i.special!=='milk');
       if(nonMilkItems.length&&order.dateISO&&order.time){
         const[ph,pm]=order.time.split(':').map(Number);
@@ -693,7 +672,7 @@ async function submitOrder(){
   }catch(e){showToast(`❌ ${e.message||'提交失敗，請重試'}`);}
   finally{submitBtn.disabled=false;submitBtn.textContent='✓ 確認預訂';}
 }
-function renderSuccess(order){let html=`<h3>訂單明細</h3><div class="osb-row"><span class="osb-key">訂單編號</span><span style="font-family:monospace;font-size:11px">${order.id}</span></div><div class="osb-row"><span class="osb-key">訂購人</span><span>${order.profile.name} / ${order.profile.dept}</span></div>`;if(!order.isMilk)html+=`<div class="osb-row"><span class="osb-key">飲品取餐</span><span>${order.date} ${order.time}</span></div>`;html+=`<div style="height:1px;background:var(--border);margin:8px 0"></div>`;order.items.forEach(i=>{let p=i.payment==='cash'?'現金七折':i.payment==='v1'?`🎫×${i.qty}`:i.payment==='v4'?`🎫×${4*i.qty}`:i.payment==='v1p5'?`🎫×${i.qty}+🪙${5*i.qty}`:i.payment==='v1p2'?'🎉 促銷1券/2支':`🎫×${2*i.qty}`;let extra=i.milkDateLabel?`<span style="font-size:11px;color:var(--dim);margin-left:4px">${i.milkDateLabel}</span>`:'';html+=`<div class="osb-row"><span>${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}${extra}</span><span class="osb-key">${p}</span></div>`;});html+=`<div style="height:1px;background:var(--border);margin:8px 0"></div>`;if(order.cash>0)html+=`<div class="osb-row"><span class="osb-key">現金</span><span style="font-weight:700;color:var(--gold)">$${order.cash}</span></div>`;if(order.vouchers>0)html+=`<div class="osb-row"><span class="osb-key">兌換券</span><span style="font-weight:700;color:var(--gold)">×${order.vouchers} 張</span></div>`;if(order.hasRack!=null)html+=`<div class="osb-row"><span class="osb-key">杯架</span><span>${order.hasRack?'✅':'❌'}</span></div>`;document.getElementById('success-summary').innerHTML=html;const hasDrinks=order.items.some(i=>!i.special);
+function renderSuccess(order){let html=`<h3>訂單明細</h3><div class="osb-row"><span class="osb-key">訂單編號</span><span style="font-family:monospace;font-size:11px">${order.id}</span></div><div class="osb-row"><span class="osb-key">訂購人</span><span>${order.profile.name} / ${order.profile.dept}</span></div>`;if(!order.isMilk)html+=`<div class="osb-row"><span class="osb-key">飲品取餐</span><span>${order.date} ${order.time}</span></div>`;html+=`<div style="height:1px;background:var(--border);margin:8px 0"></div>`;order.items.forEach(i=>{let p=i.payment==='cash'?'現金七折':i.payment==='v1'?`🎫×${i.qty}`:i.payment==='v4'?`🎫×${4*i.qty}`:`🎫×${2*i.qty}`;let extra=i.milkDateLabel?`<span style="font-size:11px;color:var(--dim);margin-left:4px">${i.milkDateLabel}</span>`:'';html+=`<div class="osb-row"><span>${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}${extra}</span><span class="osb-key">${p}</span></div>`;});html+=`<div style="height:1px;background:var(--border);margin:8px 0"></div>`;if(order.cash>0)html+=`<div class="osb-row"><span class="osb-key">現金</span><span style="font-weight:700;color:var(--gold)">$${order.cash}</span></div>`;if(order.vouchers>0)html+=`<div class="osb-row"><span class="osb-key">兌換券</span><span style="font-weight:700;color:var(--gold)">×${order.vouchers} 張</span></div>`;if(order.hasRack!=null)html+=`<div class="osb-row"><span class="osb-key">杯架</span><span>${order.hasRack?'✅':'❌'}</span></div>`;document.getElementById('success-summary').innerHTML=html;const hasDrinks=order.items.some(i=>!i.special);
   // Dynamic success icon
   const iconEl=document.getElementById('success-icon');const imgUrl=S.settings.successImageUrl||'';
   if(imgUrl){iconEl.innerHTML=`<img src="${imgUrl}" style="width:80px;height:80px;object-fit:contain;border-radius:12px">`;}else{iconEl.textContent='✅';}
@@ -727,7 +706,7 @@ function renderOrderList(filter){
     const rk=o.hasRack!=null?`<span style="font-size:12px;color:${o.hasRack?'var(--green)':'var(--dim)'}">${o.hasRack?'✅杯架':'❌無架'}</span>`:'';
     const statusBadge=(st==='done'||st==='picked_up')?'<span class="oc-status picked">🛍 已取貨</span>'
       :st==='cancelled'?'<span class="oc-status cancelled">✕ 已取消</span>':'';
-    const itml=(o.items||[]).map(i=>{let p=i.payment==='cash'?'七折':i.payment==='v1'?`🎫×${i.qty}`:i.payment==='v4'?`🎫×${4*i.qty}`:i.payment==='v1p5'?`🎫×${i.qty}+${5*i.qty}`:`🎫×${2*i.qty}`;let ml=i.milkDateLabel?` (${i.milkDateLabel})`:'';return`<div class="oc-item-row">· ${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}（${p}）${ml}</div>`;}).join('');
+    const itml=(o.items||[]).map(i=>{let p=i.payment==='cash'?'七折':i.payment==='v1'?`🎫×${i.qty}`:i.payment==='v4'?`🎫×${4*i.qty}`:`🎫×${2*i.qty}`;let ml=i.milkDateLabel?` (${i.milkDateLabel})`:'';return`<div class="oc-item-row">· ${i.name}${i.temp==='hot'?' 熱':i.temp==='cold'?' 冰':''} ×${i.qty}（${p}）${ml}</div>`;}).join('');
     const calDayLink=(!o.isMilk&&o.dateISO)?`https://calendar.google.com/calendar/r/day/${o.dateISO.split('-').join('/')}`:null;
     const cancelExtra=isCancelled&&calDayLink?`<a href="${calDayLink}" target="_blank" rel="noopener" style="font-size:11px;color:#88bbff;margin-left:8px">📅 行事曆刪除</a>`:'';
     return`<div class="order-card${isCancelled?' is-cancelled':''}">
@@ -753,23 +732,13 @@ async function updateOrderStatus(orderId,newStatus){
     await db.collection('orders').doc(orderId).update({status:newStatus});
     if(newStatus==='cancelled'&&o){
       updateSlotCount(o,-1).catch(e=>console.error('slotCount -1 failed:',e));
-      // 還冰棒庫存
-      const iceItems=(o.items||[]).filter(i=>i.special==='icecream');
-      if(iceItems.length){
-        const stockRef=db.collection('settings').doc('icestock');
-        const snap=await stockRef.get();
-        const stock=snap.exists?snap.data():{...ICE_DEFAULT};
-        iceItems.forEach(i=>{stock[i.id]=(stock[i.id]||0)+i.qty;S.iceStock[i.id]=(S.iceStock[i.id]||0)+i.qty;});
-        await stockRef.set(stock);
-        buildMenu();
-      }
       // 行事曆連結（Google Calendar 日視圖，注意不能有前導零）
       if(!o.isMilk&&o.dateISO){
         const[y,m,d]=o.dateISO.split('-');
         const link=`https://calendar.google.com/calendar/r/day/${y}/${parseInt(m)}/${parseInt(d)}`;
-        showToast('訂單已取消，庫存已更新');
+        showToast('訂單已取消');
         setTimeout(()=>{if(confirm('前往行事曆刪除相關事件？'))window.open(link,'_blank');},400);
-      }else showToast('訂單已取消，庫存已更新');
+      }else showToast('訂單已取消');
     }else if(newStatus==='pending'){if(o&&(o.status||'')==='cancelled')updateSlotCount(o,1).catch(()=>{});showToast('已復原為待處理');}
     else if(newStatus==='done'){showToast('✅ 已完成');}
     else if(newStatus==='picked_up'){showToast('🛍 已取貨');const hasMilk=o&&(o.items||[]).some(i=>i.special==='milk');if(!hasMilk)setTimeout(()=>{if(confirm('是否一併刪除此訂單記錄？'))deleteOrder(orderId);},300);}
@@ -782,18 +751,6 @@ async function deleteOrder(orderId){
     const st=o?(o.status||''):'';
     if(o&&st!=='cancelled'){
       updateSlotCount(o,-1).catch(()=>{});
-      // Only restore ice cream stock if order was never fulfilled
-      if(st!=='done'&&st!=='picked_up'){
-        const iceItems=(o.items||[]).filter(i=>i.special==='icecream');
-        if(iceItems.length){
-          const stockRef=db.collection('settings').doc('icestock');
-          const snap=await stockRef.get();
-          const stock=snap.exists?snap.data():{...ICE_DEFAULT};
-          iceItems.forEach(i=>{stock[i.id]=(stock[i.id]||0)+i.qty;S.iceStock[i.id]=(S.iceStock[i.id]||0)+i.qty;});
-          await stockRef.set(stock);
-          buildMenu();
-        }
-      }
     }
     await db.collection('orders').doc(orderId).delete();
     showToast('🗑 訂單已刪除');
@@ -865,9 +822,6 @@ async function toggleMilkSkip(dateISO){
 }
 
 function copyMilkNotice(dateLabel,orders,dateISO){const picked=S.settings.milkPickedUp||{};const unpicked=orders.filter(o=>!picked[`${dateISO}_${o.orderId}`]);if(!unpicked.length){showToast('所有人已取貨，無需複製');return;}const merged={};unpicked.forEach(o=>{const key=`${o.name}__${o.dept}`;if(!merged[key])merged[key]={name:o.name,dept:o.dept,qty:0};merged[key].qty+=o.qty;});const people=Object.values(merged).map(o=>`${o.name}（${o.dept}）${o.qty}瓶｜共 ${o.qty*4} 張券`).join('\n');const loc=S.settings.milkLocation||'';const atLoc=loc?`至${loc}領取`:'取貨';const text=`🥛 罐裝牛奶到貨囉！\n\n${dateLabel} 取貨同仁：\n${people}\n\n今天下班前可${atLoc}，請注意咖啡券有效期限並簽名，謝謝！`;navigator.clipboard?.writeText(text).then(()=>showToast('✅ 通知文字已複製，請貼到 LINE / 群組通知大家')).catch(()=>{alert(text);});}
-function renderStockPanel(){document.getElementById('ice-stock-rows').innerHTML=ICE_IDS.map(id=>`<div class="ice-flavor-row"><span class="ice-flavor-name">${ICE_HEARTS[id]} ${ICE_NAMES[id]}</span><div class="ifqc"><button onclick="adjIce('${id}',-1)">−</button><div class="ifn" id="is-${id}">${S.iceStock[id]??0}</div><button onclick="adjIce('${id}',1)">+</button></div></div>`).join('');const orders=S._allOrders;const today=new Date().toLocaleDateString('zh-TW');const bf={};ICE_IDS.forEach(id=>{bf[id]=0;});orders.filter(o=>o.date===today).flatMap(o=>(o.items||[]).filter(i=>i.special==='icecream')).forEach(i=>{bf[i.id]=(bf[i.id]||0)+i.qty;});const total=Object.values(bf).reduce((s,v)=>s+v,0);document.getElementById('stock-today-summary').innerHTML=`<div style="font-size:14px;font-weight:600;margin-bottom:8px">今日冰棒訂單（${today}）：共 ${total} 支</div>`+ICE_IDS.filter(id=>bf[id]>0).map(id=>`<div style="font-size:13px;color:var(--dim);margin-bottom:4px">${ICE_HEARTS[id]} ${ICE_NAMES[id]}：${bf[id]} 支</div>`).join('')+(total===0?'<div style="font-size:13px;color:var(--dim)">今日尚無冰棒訂單</div>':'');}
-function adjIce(id,delta){S.iceStock[id]=Math.max(0,(S.iceStock[id]??0)+delta);const el=document.getElementById('is-'+id);if(el)el.textContent=S.iceStock[id];}
-async function saveIceStock(){try{await db.collection('settings').doc('icestock').set(S.iceStock);showToast('✅ 庫存已儲存');buildMenu();}catch(e){showToast('❌ 儲存失敗');}}
 // ── Closed dates calendar ──
 let _calY=new Date().getFullYear(),_calM=new Date().getMonth();
 function renderClosedDatesCalendar(){
@@ -969,10 +923,6 @@ async function setItemVoucherOverride(itemId,n){
 async function resetItemVoucher(itemId){
   try{await saveItemOverrideFields(itemId,{voucherOverride:null});buildMenu();renderProductsPanel();showToast('✅ 已重設券張數');}catch(e){showToast('❌ 更新失敗');}
 }
-async function setIcePromo(val){
-  S.settings.icePromo=val;
-  try{await db.collection('settings').doc('admin').set({icePromo:val},{merge:true});buildMenu();renderProductsPanel();showToast(val?'🎉 促銷已開啟':'✅ 促銷已關閉');}catch(e){showToast('❌ 更新失敗');}
-}
 function renderProductsPanel(){
   const el=document.getElementById('products-admin-content');if(!el)return;
   // Migrate legacy seasonalItems
@@ -987,7 +937,7 @@ function renderProductsPanel(){
   let html='';
   html+=`<div style="font-size:13px;font-weight:700;color:var(--dim);padding:12px 0 6px">── 分類與品項管理 ──</div>`;
   orderedCats.forEach((cat,catIdx)=>{
-    const isMenu=cat._isMenu;const isIceCream=cat.id==='icecream';const isMilk=cat.id==='bottled';
+    const isMenu=cat._isMenu;const isMilk=cat.id==='bottled';
     const canUp=catIdx>0,canDown=catIdx<totalCats-1;
     if(isMenu){
       html+=`<details style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">`;
@@ -1021,7 +971,7 @@ function renderProductsPanel(){
       if(isExtra)html+=`<button onclick="deleteMenuExtraItem('${cat.id}','${item.id}')" style="${BTNR}">🗑</button>`;
       if(!isMenu)html+=`<button onclick="deleteCustomCategoryItem('${cat.id}','${item.id}')" style="${BTNR}">🗑</button>`;
       html+=`</div>`;
-      if(!isIceCream&&!isMilk){
+      if(!isMilk){
         const priceOv=ov.priceOverride!=null?ov.priceOverride:item.price;
         const tempOv=ov.tempOverride||item.temp;
         if(item.temp||isMenu){html+=`<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;color:var(--dim)">冷熱：</span>${['both','hot','cold'].map(t=>`<button onclick="setItemTempOverride('${item.id}','${t}')" style="padding:3px 8px;border-radius:5px;border:1px solid ${tempOv===t?'rgba(68,136,238,.5)':'var(--border)'};background:${tempOv===t?'rgba(68,136,238,.2)':'transparent'};color:${tempOv===t?'#88bbff':'var(--text)'};font-size:11px;cursor:pointer;font-family:inherit">${t==='hot'?'🔥熱':t==='cold'?'🧊冰':'☕兩者'}</button>`).join('')}</div>`;}
@@ -1033,13 +983,8 @@ function renderProductsPanel(){
       html+=`<div style="display:flex;gap:6px;align-items:center;font-size:12px;flex-wrap:wrap"><label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" ${noteEnabled?'checked':''} onchange="setItemNoteEnabled('${item.id}',this.checked)"> 顯示備註</label>${noteEnabled?`<input type="text" value="${note}" placeholder="備註（顯示於前台品項卡）" style="flex:1;min-width:100px;padding:3px 7px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;font-family:inherit" onchange="setItemNote('${item.id}',this.value)">`:''}</div>`;
       html+=`</div>`;
     });
-    // Ice cream promo section
-    if(isIceCream){
-      const promo=!!S.settings.icePromo;
-      html+=`<div style="margin-top:8px;padding:10px;background:var(--surf2);border-radius:8px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">🎉 促銷設定</div><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" ${promo?'checked':''} onchange="setIcePromo(this.checked)"> 開啟促銷：1張券兌換2支冰棒（口味任選）</label></div>`;
-    }
     // Add item form (for MENU non-special cats and all custom cats)
-    const showAddForm=!isIceCream&&!isMilk;
+    const showAddForm=!isMilk;
     if(showAddForm){
       html+=`<div style="padding:10px;background:rgba(255,255,255,.04);border-radius:7px;border:1px solid var(--border);margin-top:6px"><div style="font-size:11px;color:var(--dim);margin-bottom:5px">新增品項到此分類</div>`;
       html+=`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px"><input type="text" id="ci-name-${cat.id}" placeholder="品項名稱" style="flex:2;min-width:90px;padding:5px 7px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;font-family:inherit"><input type="number" id="ci-price-${cat.id}" placeholder="售價" min="0" style="flex:1;min-width:55px;max-width:75px;padding:5px 7px;border-radius:5px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;font-family:inherit"></div>`;
@@ -1050,14 +995,10 @@ function renderProductsPanel(){
     }
     if(isMenu){html+=`</div></details>`;}else{html+=`</div></div>`;}
   });
-  // Ice cream stock section
-  html+=`<div style="font-size:13px;font-weight:700;color:var(--dim);padding:12px 0 6px">── 冰棒庫存 ──</div>`;
-  html+=`<div style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px"><div id="ice-stock-rows"></div><div id="stock-today-summary" style="margin-top:8px"></div><button class="asave-btn" onclick="saveIceStock()" style="margin-top:8px">儲存庫存</button></div>`;
   // Add custom category
   html+=`<div style="font-size:13px;font-weight:700;color:var(--dim);padding:12px 0 6px">── 新增自定義分類 ──</div>`;
   html+=`<div style="background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:8px"><input type="text" id="new-cat-label" placeholder="分類名稱（例：🌟 季節限定）" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;font-family:inherit"><button onclick="addCustomCategory()" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(68,170,85,.4);background:rgba(68,170,85,.15);color:var(--green);font-size:13px;cursor:pointer;font-family:inherit;flex-shrink:0">＋ 新增</button></div></div>`;
   el.innerHTML=html;
-  renderStockPanel();
 }
 async function saveItemOverrideFields(itemId,fields){const cur=S.settings.itemOverrides||{};cur[itemId]={...(cur[itemId]||{}),...fields};S.settings.itemOverrides={...cur};await db.collection('settings').doc('admin').set({itemOverrides:S.settings.itemOverrides},{merge:true});}
 async function toggleItemPaused(itemId){const paused=!((S.settings.itemOverrides||{})[itemId]||{}).paused;try{await saveItemOverrideFields(itemId,{paused});buildMenu();renderProductsPanel();showToast(paused?'⏸ 已暫停售賣':'▶ 已恢復售賣');}catch(e){showToast('❌ 更新失敗');}}
