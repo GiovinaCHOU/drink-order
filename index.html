@@ -1083,8 +1083,8 @@ async function updateSnow(){const st=S.settings||{};const mode=st.snowMode||'aut
  if(on&&!_snow)startSnow();else if(!on&&_snow)stopSnow();}
 function startSnow(){const c=document.createElement('canvas');c.id='snow';c.style.cssText='position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:900';document.body.appendChild(c);const x=c.getContext('2d');let W,H,dpr;
  const size=()=>{dpr=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0)};size();addEventListener('resize',size);
- const N=Math.round(Math.min(70,Math.max(28,innerWidth/14)));
- const mk=(top)=>{const big=Math.random()<.55;return{x:Math.random()*innerWidth,y:top?-20:Math.random()*innerHeight,r:big?5+Math.random()*7:1.2+Math.random()*1.8,big,v:big?.35+Math.random()*.6:.5+Math.random()*.8,w:Math.random()*6.28,a:Math.random()*6.28,s:(Math.random()-.5)*.02,o:big?.55+Math.random()*.4:.4+Math.random()*.4,k:Math.random()<.5}};
+ const N=Math.round(Math.min(90,Math.max(40,innerWidth/10)));
+ const mk=(top)=>{const big=Math.random()<.55;return{x:Math.random()*innerWidth,y:top?-20:Math.random()*innerHeight,r:big?3+Math.random()*3.5:1+Math.random()*1.4,big,v:big?.35+Math.random()*.6:.5+Math.random()*.8,w:Math.random()*6.28,a:Math.random()*6.28,s:(Math.random()-.5)*.02,o:big?.55+Math.random()*.4:.4+Math.random()*.4,k:Math.random()<.5}};
  const F=Array.from({length:N},()=>mk(false));
  const flake=f=>{x.save();x.translate(f.x,f.y);x.rotate(f.a);x.globalAlpha=f.o;x.strokeStyle='#fff';x.lineCap='round';x.lineWidth=Math.max(1,f.r/5);x.shadowColor='rgba(255,255,255,.6)';x.shadowBlur=f.r/2;
   for(let i=0;i<6;i++){x.beginPath();x.moveTo(0,0);x.lineTo(0,-f.r);const b1=f.r*.45,b2=f.r*.72,l1=f.r*.32,l2=f.r*.22;
