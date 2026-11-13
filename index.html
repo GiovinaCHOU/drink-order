@@ -433,6 +433,12 @@ body{font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;
         <input type="text" id="milk-deadline" placeholder="例如：16:30">
       </div>
       <div class="srow" style="flex-direction:column;align-items:stretch">
+        <div class="sr-label">❄️ 下雪特效</div>
+        <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 8px">自動：永和現在氣溫低於設定溫度時，點餐頁會飄雪</div>
+        <select id="snow-mode" style="padding:10px;border-radius:8px;background:var(--surf);color:var(--text);border:1px solid var(--border)"><option value="auto">自動（依氣溫）</option><option value="on">一直開啟</option><option value="off">關閉</option></select>
+        <input type="number" id="snow-temp" min="-10" max="30" step="1" placeholder="低於幾度下雪，例如：16" style="margin-top:6px">
+      </div>
+      <div class="srow" style="flex-direction:column;align-items:stretch">
         <div class="sr-label">管理員密碼</div>
         <div class="sr-sub" style="font-size:12px;color:var(--dim);margin:4px 0 8px">按下面按鈕，系統會寄重設密碼的信到管理員信箱</div>
         <button class="btn-secondary" style="padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--text)" onclick="sendPwReset()">寄送重設密碼信</button>
@@ -479,13 +485,13 @@ async function init(){
     if(p){S.profile=JSON.parse(p);renderProfileChip();showView('v-order');}else showView('v-profile');
     const nv=nextValidDate();if(nv){S.selDate=nv.date;S.selTime=nv.slot;}
     updateDTDisplay();buildMenu();renderCart();renderNotices();
-    startTimeWatcher();
+    startTimeWatcher();updateSnow();
   }catch(e){console.error(e);showToast('⚠️ 資料庫連線失敗，請檢查網路');showView('v-profile');}
 }
 async function loadSettingsFromDB(){const s=await db.collection('settings').doc('admin').get();if(s.exists){const d=s.data();S.settings={...S.settings,...d};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}}
 function subscribeOrders(){if(_unsubOrders)_unsubOrders();_unsubOrders=db.collection('orders').orderBy('createdAt','desc').limit(300).onSnapshot(s=>{S._allOrders=s.docs.map(d=>d.data());renderOrderList(curFilter);});}
 let _unsubSlots=null,_unsubSettings=null;
-function subscribeSettings(){if(_unsubSettings)_unsubSettings();_unsubSettings=db.collection('settings').doc('admin').onSnapshot(s=>{if(s.exists){const d=s.data();S.settings={...S.settings,...d};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}renderNotices();buildMilkDateChips();},e=>console.warn('settings sync error:',e));}
+function subscribeSettings(){if(_unsubSettings)_unsubSettings();_unsubSettings=db.collection('settings').doc('admin').onSnapshot(s=>{if(s.exists){const d=s.data();S.settings={...S.settings,...d};if(!Array.isArray(S.settings.closedDates))S.settings.closedDates=[];}renderNotices();buildMilkDateChips();updateSnow();},e=>console.warn('settings sync error:',e));}
 function subscribeSlotCounts(){if(_unsubSlots)_unsubSlots();_unsubSlots=db.collection('settings').doc('slotCounts').onSnapshot(s=>{S.slotCounts=s.exists?s.data():{};if(S.selDate&&S.selTime&&document.getElementById('v-order').classList.contains('active'))checkTimeValidity();},e=>{console.warn('slotCounts subscription error:',e);});}
 // ── Time watcher: auto-jump if current slot expires ──
 function startTimeWatcher(){setInterval(checkTimeValidity,30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkTimeValidity();});}
@@ -708,7 +714,7 @@ async function checkPin(){const em=document.getElementById('admin-email').value.
 async function adminSignOut(){if(_unsubOrders){_unsubOrders();_unsubOrders=null;}try{await firebase.auth().signOut()}catch(e){}showView('v-order');showToast('已登出');}
 async function sendPwReset(){const u=firebase.auth().currentUser;if(!u||!u.email){showToast('請先登入');return;}try{await firebase.auth().sendPasswordResetEmail(u.email);showToast('✅ 已寄出重設密碼信');}catch(e){showToast('❌ 寄送失敗');}}
 document.getElementById('pin-input').addEventListener('keydown',e=>{if(e.key==='Enter')checkPin();});
-function loadAdminUI(){document.getElementById('ntfy-topic').value=S.settings.ntfyTopic||'';document.getElementById('bear-url').value=S.settings.bearUrl||'';document.getElementById('success-image-url').value=S.settings.successImageUrl||'';document.getElementById('success-note').value=S.settings.successNote||'';document.getElementById('holiday-note').value=S.settings.holidayNote||'';document.getElementById('order-note').value=S.settings.orderNote||'';document.getElementById('milk-pickup-time').value=S.settings.milkPickupTime||'15:00';document.getElementById('milk-deadline').value=S.settings.milkDeadline||'16:30';const days=S.settings.milkDeliveryDays||[2,5];[1,2,3,4,5,6].forEach(n=>{const el=document.getElementById('milk-day-'+n);if(el)el.checked=days.includes(n);});renderClosedDatesCalendar();}
+function loadAdminUI(){document.getElementById('ntfy-topic').value=S.settings.ntfyTopic||'';document.getElementById('bear-url').value=S.settings.bearUrl||'';document.getElementById('success-image-url').value=S.settings.successImageUrl||'';document.getElementById('success-note').value=S.settings.successNote||'';document.getElementById('holiday-note').value=S.settings.holidayNote||'';document.getElementById('order-note').value=S.settings.orderNote||'';document.getElementById('milk-pickup-time').value=S.settings.milkPickupTime||'15:00';document.getElementById('milk-deadline').value=S.settings.milkDeadline||'16:30';document.getElementById('snow-mode').value=S.settings.snowMode||'auto';document.getElementById('snow-temp').value=S.settings.snowTemp??16;const days=S.settings.milkDeliveryDays||[2,5];[1,2,3,4,5,6].forEach(n=>{const el=document.getElementById('milk-day-'+n);if(el)el.checked=days.includes(n);});renderClosedDatesCalendar();}
 function switchAdminTab(tab){document.querySelectorAll('.atab').forEach((t,i)=>t.classList.toggle('active',['orders','milk','stock','settings'][i]===tab));document.querySelectorAll('.apanel').forEach(p=>p.classList.remove('active'));document.getElementById('panel-'+tab).classList.add('active');if(tab==='stock')renderProductsPanel();if(tab==='milk')renderMilkAdmin();}
 function filterOrders(chip){document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));chip.classList.add('active');curFilter=chip.dataset.f;renderOrderList(curFilter);}
 function renderOrderList(filter){
@@ -1051,7 +1057,7 @@ async function renameCustomCategory(catId,label){const cc=(S.settings.customCate
 async function deleteCustomCategory(catId){if(!confirm('確定刪除此分類及所有品項？'))return;const cc=(S.settings.customCategories||[]).filter(c=>c.id!==catId);S.settings.customCategories=cc;try{await db.collection('settings').doc('admin').set({customCategories:cc},{merge:true});renderProductsPanel();buildMenu();showToast('🗑 已刪除分類');}catch(e){showToast('❌ 刪除失敗');}}
 async function addCustomCategoryItem(catId){const name=document.getElementById(`ci-name-${catId}`).value.trim();const price=parseInt(document.getElementById(`ci-price-${catId}`).value)||0;const temp=document.querySelector(`input[name="ci-temp-${catId}"]:checked`)?.value||'both';if(!name){showToast('請輸入品項名稱');return;}const id='ci_'+Date.now();const cc=(S.settings.customCategories||[]).map(c=>c.id===catId?{...c,items:[...(c.items||[]),{id,name,price,temp}]}:c);S.settings.customCategories=cc;try{await db.collection('settings').doc('admin').set({customCategories:cc},{merge:true});renderProductsPanel();buildMenu();showToast('✅ 已新增品項');}catch(e){showToast('❌ 新增失敗');}}
 async function deleteCustomCategoryItem(catId,itemId){const cc=(S.settings.customCategories||[]).map(c=>c.id===catId?{...c,items:(c.items||[]).filter(i=>i.id!==itemId)}:c);S.settings.customCategories=cc;try{await db.collection('settings').doc('admin').set({customCategories:cc},{merge:true});renderProductsPanel();buildMenu();showToast('🗑 已刪除品項');}catch(e){showToast('❌ 刪除失敗');}}
-async function saveSettings(){const cfg={ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),successImageUrl:document.getElementById('success-image-url').value.trim(),successNote:document.getElementById('success-note').value,holidayNote:document.getElementById('holiday-note').value,orderNote:document.getElementById('order-note').value,milkPickupTime:document.getElementById('milk-pickup-time').value.trim()||'15:00',milkDeliveryDays:[1,2,3,4,5,6].filter(n=>{const el=document.getElementById('milk-day-'+n);return el&&el.checked;}),milkDeadline:document.getElementById('milk-deadline').value.trim()||'16:30',closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};renderNotices();try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
+async function saveSettings(){const cfg={ntfyTopic:document.getElementById('ntfy-topic').value.trim(),bearUrl:document.getElementById('bear-url').value.trim(),successImageUrl:document.getElementById('success-image-url').value.trim(),successNote:document.getElementById('success-note').value,holidayNote:document.getElementById('holiday-note').value,orderNote:document.getElementById('order-note').value,milkPickupTime:document.getElementById('milk-pickup-time').value.trim()||'15:00',milkDeliveryDays:[1,2,3,4,5,6].filter(n=>{const el=document.getElementById('milk-day-'+n);return el&&el.checked;}),milkDeadline:document.getElementById('milk-deadline').value.trim()||'16:30',snowMode:document.getElementById('snow-mode').value,snowTemp:Number(document.getElementById('snow-temp').value)||16,closedDates:S.settings.closedDates||[]};S.settings={...S.settings,...cfg};renderNotices();try{await db.collection('settings').doc('admin').set(cfg,{merge:true});showToast('✅ 設定已儲存');}catch(e){showToast('❌ 儲存失敗');}}
 function clearAllOrdersWithPin(){setTimeout(()=>{const t=prompt('確定要清除所有訂單？請輸入「清除」兩個字確認');if(t===null)return;if(t.trim()!=='清除'){showToast('未清除');return;}clearAllOrders();},300);}
 async function clearAllOrders(){try{const snap=await db.collection('orders').get();const batch=db.batch();snap.docs.forEach(d=>batch.delete(d.ref));await batch.commit();showToast('✅ 所有訂單已清除');}catch(e){showToast('❌ 清除失敗');}}
 async function testNtfy(){const topic=document.getElementById('ntfy-topic').value.trim();const res=document.getElementById('ntfy-test-result');if(!topic){res.style.color='var(--red)';res.textContent='請先填入 Topic 名稱';return;}res.style.color='var(--dim)';res.textContent='傳送中...';try{const r=await fetch(`https://ntfy.sh/${topic}`,{method:'POST',body:'Test - drink order system connected'});if(r.ok){res.style.color='var(--green)';res.textContent='✅ 已送出，請確認手機是否收到';}else{res.style.color='var(--red)';res.textContent=`❌ 失敗（${r.status}）`;}}catch(e){res.style.color='var(--red)';res.textContent='❌ 網路錯誤：'+e.message;}}
@@ -1066,5 +1072,22 @@ init();
     <button onclick="closeHolidayModal()" style="width:100%;padding:13px;border-radius:10px;border:none;background:var(--red);color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">我知道了！關閉視窗</button>
   </div>
 </div>
+<script>
+// ── 下雪特效 ──
+let _snow=null;
+async function currentTemp(){try{const c=JSON.parse(sessionStorage.getItem('wxTemp')||'null');if(c&&Date.now()-c.t<1800000)return c.v;}catch(e){}
+ try{const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=25.01&longitude=121.51&current=temperature_2m&timezone=Asia%2FTaipei');const j=await r.json();const v=j.current&&j.current.temperature_2m;if(typeof v==='number'){try{sessionStorage.setItem('wxTemp',JSON.stringify({t:Date.now(),v}))}catch(e){}return v;}}catch(e){}return null;}
+async function updateSnow(){const st=S.settings||{};const mode=st.snowMode||'auto';let on=mode==='on';
+ if(mode==='auto'){const t=await currentTemp();on=t!==null&&t<(Number(st.snowTemp)||16);}
+ if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)on=false;
+ if(on&&!_snow)startSnow();else if(!on&&_snow)stopSnow();}
+function startSnow(){const c=document.createElement('canvas');c.id='snow';c.style.cssText='position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:900';document.body.appendChild(c);const x=c.getContext('2d');let W,H,dpr;
+ const size=()=>{dpr=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;x.setTransform(dpr,0,0,dpr,0,0)};size();addEventListener('resize',size);
+ const N=Math.round(Math.min(90,Math.max(35,innerWidth/10)));const F=Array.from({length:N},()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:1+Math.random()*2.6,v:.3+Math.random()*.9,w:Math.random()*6.28,o:.35+Math.random()*.5}));
+ let raf=0;const tick=()=>{x.clearRect(0,0,W,H);for(const f of F){f.y+=f.v;f.w+=.012;f.x+=Math.sin(f.w)*.45;if(f.y>H+5){f.y=-5;f.x=Math.random()*W}if(f.x>W+5)f.x=-5;if(f.x<-5)f.x=W+5;x.globalAlpha=f.o;x.beginPath();x.arc(f.x,f.y,f.r,0,6.283);x.fillStyle='#fff';x.fill();}raf=requestAnimationFrame(tick)};
+ const vis=()=>{cancelAnimationFrame(raf);if(!document.hidden)raf=requestAnimationFrame(tick)};document.addEventListener('visibilitychange',vis);raf=requestAnimationFrame(tick);
+ _snow={stop(){cancelAnimationFrame(raf);removeEventListener('resize',size);document.removeEventListener('visibilitychange',vis);c.remove()}};}
+function stopSnow(){if(_snow){_snow.stop();_snow=null}}
+</script>
 </body>
 </html>
