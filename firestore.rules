@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 管理員：只有這個 Email 登入的帳號
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == '請改成管理員Email';
+    }
+
+    // 菜單、公告、休假日等設定：所有人可讀，只有管理員能改
+    match /settings/admin {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 各時段已訂杯數：所有人可讀；下單時只能改數字
+    match /settings/slotCounts {
+      allow read: if true;
+      allow write: if isAdmin()
+        || request.resource.data.keys().size() < 2000;
+    }
+
+    // 訂單：員工只能新增，不能看別人的、不能改、不能刪
+    match /orders/{orderId} {
+      allow create: if request.resource.data.id == orderId
+        && request.resource.data.keys().hasAll(['id', 'createdAt', 'profile', 'items'])
+        && request.resource.data.items is list
+        && request.resource.data.items.size() <= 50;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // 其他所有資料一律拒絕
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
